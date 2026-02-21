@@ -4,6 +4,7 @@ import { useInterview } from '../context/InterviewContext';
 import { useTTS } from '../hooks/useTTS';
 import { useDeepgramTranscription } from '../hooks/useDeepgramTranscription';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
+import { useFaceDetection } from '../hooks/useFaceDetection';
 import { analyzePause, scoreAnswer, prefetchTTS } from '../services/openai';
 import { countFillers } from '../hooks/useFillerDetection';
 import type { QuestionResult } from '../types';
@@ -35,12 +36,15 @@ export default function InterviewScreen() {
   const deepgram = useDeepgramTranscription();
 
   // ─── Main's camera state ───
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const transcriptBodyRef = useRef<HTMLDivElement | null>(null);
   const [cameraStatus, setCameraStatus] = useState<'loading' | 'ready' | 'unsupported' | 'error'>('loading');
   const [cameraError, setCameraError] = useState('');
   const [cameraEnabled, setCameraEnabled] = useState(true);
+
+  // ─── Face detection ───
+  const faceDetection = useFaceDetection({ videoElement: videoRef, enabled: cameraEnabled });
 
   // ─── Matthew's orchestration state ───
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -320,6 +324,11 @@ export default function InterviewScreen() {
         log.error('Deepgram transcription failed', { error: String(e) });
       }
     }
+
+    // Start face detection (non-blocking — errors won't break the interview)
+    if (cameraEnabled) {
+      void faceDetection.start();
+    }
   };
 
   // ─── beginNextQuestion: TTS transition + start recording for next question ───
@@ -390,6 +399,12 @@ export default function InterviewScreen() {
         log.error('Deepgram transcription failed for next question', { error: String(e) });
       }
     }
+
+    // Reset + restart face detection for the new question
+    if (cameraEnabled) {
+      faceDetection.reset();
+      void faceDetection.start();
+    }
   };
 
   // ─── handleDone: handles end of answer for current question ───
@@ -411,6 +426,7 @@ export default function InterviewScreen() {
     clearSilenceTimer();
     stopPlayback();
     deepgram.stop();
+    faceDetection.stop();
 
     const currentState = stateRef.current;
     const currentIdx = currentState.currentQuestionIndex;
@@ -458,6 +474,7 @@ export default function InterviewScreen() {
           fillerCount: countFillers(transcript),
           wordsPerMinute: currentState.wordsPerMinute,
           speakingDurationSeconds: Math.round(totalDuration),
+          faceMetrics: cameraEnabled ? faceDetection.getSessionAverages() : undefined,
         },
       };
       dispatch({ type: 'SAVE_QUESTION_RESULT', payload: questionResult });
@@ -614,15 +631,17 @@ export default function InterviewScreen() {
 
   // Cleanup on unmount
   const deepgramStop = deepgram.stop;
+  const faceStop = faceDetection.stop;
   useEffect(() => {
     return () => {
       activeRef.current = false;
       clearSilenceTimer();
       stopPlayback();
       deepgramStop();
+      faceStop();
       void stopRecording();
     };
-  }, [clearSilenceTimer, stopPlayback, stopRecording, deepgramStop]);
+  }, [clearSilenceTimer, stopPlayback, stopRecording, deepgramStop, faceStop]);
 
   // Auto-scroll transcript
   useEffect(() => {
