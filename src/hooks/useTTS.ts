@@ -12,6 +12,7 @@ export function useTTS() {
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const pendingRejectRef = useRef<((reason: Error) => void) | null>(null);
 
   const cleanupAudio = useCallback(() => {
     if (audioRef.current) {
@@ -25,6 +26,11 @@ export function useTTS() {
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = null;
+    }
+    // Reject any pending playBlob promise so speak() doesn't hang forever
+    if (pendingRejectRef.current) {
+      pendingRejectRef.current(new Error('Playback interrupted'));
+      pendingRejectRef.current = null;
     }
   }, []);
 
@@ -63,6 +69,7 @@ export function useTTS() {
   const playBlob = useCallback((blob: Blob): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
       cleanupAudio();
+      pendingRejectRef.current = reject;
 
       const objectUrl = URL.createObjectURL(blob);
       objectUrlRef.current = objectUrl;
@@ -72,21 +79,27 @@ export function useTTS() {
 
       // Timeout: if audio doesn't start playing within threshold, reject
       const playbackTimeout = setTimeout(() => {
+        pendingRejectRef.current = null;
         log.warn('Playback timeout — audio did not start in time');
         reject(new Error('Playback timeout'));
       }, PLAYBACK_TIMEOUT_MS);
 
       audio.oncanplaythrough = () => {
         clearTimeout(playbackTimeout);
-        audio.play().catch(reject);
+        audio.play().catch((err) => {
+          pendingRejectRef.current = null;
+          reject(err);
+        });
       };
 
       audio.onended = () => {
+        pendingRejectRef.current = null;
         log.info('Playback ended');
         resolve();
       };
 
       audio.onerror = () => {
+        pendingRejectRef.current = null;
         clearTimeout(playbackTimeout);
         reject(new Error('HTMLAudio playback error'));
       };
@@ -111,6 +124,11 @@ export function useTTS() {
       log.info('Playing...');
       await playBlob(blob);
     } catch (error) {
+      // If playback was externally interrupted (e.g. component unmount / HMR), don't fall back
+      if (error instanceof Error && error.message === 'Playback interrupted') {
+        log.info('Playback interrupted, skipping fallback');
+        throw error;
+      }
       log.error('OpenAI TTS failed, falling back to speechSynthesis', { error: String(error) });
       try {
         await speakWithNativeFallback(text);

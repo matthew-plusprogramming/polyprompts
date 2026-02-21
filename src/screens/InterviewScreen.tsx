@@ -629,19 +629,24 @@ export default function InterviewScreen() {
     });
   }, [state.liveTranscript, state.isRecording, dispatch]);
 
-  // Cleanup on unmount
-  const deepgramStop = deepgram.stop;
-  const faceStop = faceDetection.stop;
+  // Cleanup on unmount only — use a ref so the effect has no deps and
+  // won't re-fire when callback references change (e.g. faceDetection.stop
+  // depends on `status`, causing a new ref each render and tearing down
+  // resources mid-interview).
+  const cleanupRef = useRef(() => {});
+  cleanupRef.current = () => {
+    log.info('Unmount cleanup running');
+    activeRef.current = false;
+    clearSilenceTimer();
+    stopPlayback();
+    deepgram.stop();
+    faceDetection.stop();
+    void stopRecording();
+  };
   useEffect(() => {
-    return () => {
-      activeRef.current = false;
-      clearSilenceTimer();
-      stopPlayback();
-      deepgramStop();
-      faceStop();
-      void stopRecording();
-    };
-  }, [clearSilenceTimer, stopPlayback, stopRecording, deepgramStop, faceStop]);
+    return () => cleanupRef.current();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-scroll transcript
   useEffect(() => {
