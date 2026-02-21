@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, type DragEvent, type ReactNod
 import { useNavigate } from 'react-router-dom';
 import { useInterview } from '../context/InterviewContext';
 import { seededQuestions } from '../data/questions';
-import { Difficulty, Role } from '../types';
+import type { Difficulty, Role } from '../types';
 
 /* ─────────────────────────────────────────────
    DATA
