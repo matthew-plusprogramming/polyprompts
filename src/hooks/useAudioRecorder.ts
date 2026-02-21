@@ -2,6 +2,11 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { MicVAD, type RealTimeVADOptions } from '@ricky0123/vad-web';
 import { createAudioRecorder } from '../services/audioRecorder';
 import type { AudioRecorder } from '../services/audioRecorder';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('AudioRecorder');
+const vadLog = log.child('VAD');
+const volumeLog = log.child('Volume');
 
 const SILENCE_THRESHOLD = 0.07;
 const SILENCE_DURATION_MS = 4000;
@@ -96,14 +101,14 @@ export function useAudioRecorder(options: UseAudioRecorderOptions) {
           } else if (
             Date.now() - silenceStartRef.current >= SILENCE_DURATION_MS
           ) {
-            console.log('[Volume] Silence detected (3.5s of low volume)');
+            volumeLog.info('Silence detected (4s of low volume)');
             optionsRef.current.onSilenceStart?.();
             // Reset timer so it fires again after another 3.5s of continued silence
             silenceStartRef.current = Date.now();
           }
         } else {
           if (isSilentRef.current) {
-            console.log('[Volume] Sound resumed');
+            volumeLog.info('Sound resumed');
             optionsRef.current.onSilenceEnd?.();
           }
           silenceStartRef.current = null;
@@ -111,9 +116,9 @@ export function useAudioRecorder(options: UseAudioRecorderOptions) {
         }
       }, VOLUME_CHECK_INTERVAL_MS);
 
-      console.log('[useAudioRecorder] RMS volume monitor started (dedicated AudioContext)');
+      volumeLog.info('RMS volume monitor started (dedicated AudioContext)');
     } catch (err) {
-      console.warn('[useAudioRecorder] Volume monitor setup failed:', err);
+      volumeLog.warn('Volume monitor setup failed', { error: String(err) });
     }
   }, []);
 
@@ -167,12 +172,12 @@ export function useAudioRecorder(options: UseAudioRecorderOptions) {
         ort.env.wasm.numThreads = 1;
       },
       onSpeechStart: () => {
-        console.log('[VAD] Speech started');
+        vadLog.info('Speech started');
         setUserSpeaking(true);
         optionsRef.current.onSpeechStart();
       },
       onSpeechEnd: (audio: Float32Array) => {
-        console.log('[VAD] Speech ended, audio length:', audio.length);
+        vadLog.info('Speech ended', { audioLength: audio.length });
         setUserSpeaking(false);
         optionsRef.current.onSpeechEnd(audio);
       },
@@ -210,19 +215,19 @@ export function useAudioRecorder(options: UseAudioRecorderOptions) {
           source.connect(compressor).connect(makeupGain).connect(destination);
 
           recorderStream = destination.stream;
-          console.log('[useAudioRecorder] Audio normalization chain active');
+          log.info('Audio normalization chain active');
         } catch (normErr) {
-          console.warn('[useAudioRecorder] Audio normalization failed, using raw stream:', normErr);
+          log.warn('Audio normalization failed, using raw stream', { error: String(normErr) });
           normalizationCtxRef.current = null;
         }
 
         const recorder = createAudioRecorder({
           onMicDisconnect: () => {
-            console.warn('[useAudioRecorder] Mic disconnected');
+            log.warn('Mic disconnected');
             optionsRef.current.onMicDisconnect?.();
           },
           onError: (err) => {
-            console.error('[useAudioRecorder] Recorder error:', err);
+            log.error('Recorder error', { error: String(err) });
           },
         });
         recorder.start(recorderStream);
@@ -237,16 +242,17 @@ export function useAudioRecorder(options: UseAudioRecorderOptions) {
 
       setVadReady(true);
       setIsRecording(true);
-      console.log('[useAudioRecorder] VAD + MediaRecorder + volume monitor started');
+      log.info('VAD + MediaRecorder + volume monitor started');
       return micStreamRef.current;
     } catch (err) {
-      console.error('[useAudioRecorder] VAD initialization failed:', err);
+      log.error('VAD initialization failed', { error: String(err) });
       setIsRecording(false);
       throw err;
     }
   }, [stopVolumeMonitor, startVolumeMonitor]);
 
   const stop = useCallback(async () => {
+    log.info('Stopping recording');
     stopVolumeMonitor();
 
     // Stop VAD

@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useInterview } from "../context/InterviewContext";
 import type { ScoreLevel, ScoringResult } from "../types";
 import "./FeedbackScreen.css";
+import { createLogger } from "../utils/logger";
+
+const log = createLogger("Feedback");
 
 const dimensions = [
   { key: "communication", label: "Communication" },
@@ -59,6 +62,15 @@ export default function FeedbackScreen() {
   const result = state.currentResult;
   const overallPercent = getOverallPercent(result);
   const hasResult = Boolean(result);
+
+  useEffect(() => {
+    log.info("Mounted", {
+      overallPercent,
+      questionId: state.currentQuestion?.id,
+      hasResult,
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [radarProgress, setRadarProgress] = useState(0);
   const animationRef = useRef<number | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -157,11 +169,13 @@ export default function FeedbackScreen() {
   };
 
   const handleRetry = () => {
+    log.info("User action: retry");
     dispatch({ type: "RETRY" });
     navigate("/interview");
   };
 
   const handleNext = () => {
+    log.info("User action: next question");
     dispatch({ type: "NEXT_QUESTION" });
     navigate("/");
   };

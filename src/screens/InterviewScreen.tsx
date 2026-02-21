@@ -12,6 +12,9 @@ import SilenceNudge from '../components/SilenceNudge';
 import cameraOnIcon from '../Icons/CameraOn.png';
 import cameraOffIcon from '../Icons/cameraOff.png';
 import starlyIcon from '../Icons/StarlyLogo.png';
+import { createLogger, setSessionId } from '../utils/logger';
+
+const log = createLogger('Interview');
 
 // ─── Phase state machine ───
 type ScreenPhase =
@@ -40,7 +43,15 @@ export default function InterviewScreen() {
 
   // ─── Matthew's orchestration state ───
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
-  const [phase, setPhase] = useState<ScreenPhase>('ready');
+  const [phase, _setPhase] = useState<ScreenPhase>('ready');
+  const setPhase = useCallback((next: ScreenPhase) => {
+    _setPhase((prev) => {
+      if (prev !== next) {
+        log.info(`Phase: ${prev} -> ${next}`, { from: prev, to: next });
+      }
+      return next;
+    });
+  }, []);
   // Status text is set by orchestration callbacks for potential future UI display
   const [, setStatusText] = useState('Click "Start Interview" to begin.');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -154,7 +165,7 @@ export default function InterviewScreen() {
       setStatusText('Listening...');
       setPhase('recording');
     }
-  }, [clearSilenceTimer]);
+  }, [clearSilenceTimer, setPhase]);
 
   const handleSilenceStart = useCallback(async () => {
     if (!activeRef.current || analyzingRef.current) return;
@@ -193,16 +204,16 @@ export default function InterviewScreen() {
       try {
         await speakRef.current("It sounds like you might be wrapping up. Are you finished with your answer, or would you like to continue?", stateRef.current.ttsVoice, stateRef.current.ttsSpeed);
       } catch (e) {
-        console.warn('[Interview] TTS nudge failed:', e);
+        log.warn('TTS nudge failed', { error: String(e) });
       }
     } catch (err) {
-      console.error('analyzePause failed:', err);
+      log.error('analyzePause failed', { error: String(err) });
       setStatusText('Listening...');
       setPhase('recording');
     }
 
     analyzingRef.current = false;
-  }, [deepgram]);
+  }, [deepgram, setPhase]);
 
   const handleSilenceEnd = useCallback(() => {
     if (!analyzingRef.current && activeRef.current) {
@@ -210,7 +221,7 @@ export default function InterviewScreen() {
       setStatusText('Listening...');
       setPhase('recording');
     }
-  }, []);
+  }, [setPhase]);
 
   const handleMicDisconnect = useCallback(() => {
     activeRef.current = false;
@@ -218,7 +229,7 @@ export default function InterviewScreen() {
     deepgram.stop();
     setPhase('mic-error');
     setStatusText('Microphone disconnected. Please reconnect and try again.');
-  }, [clearSilenceTimer, deepgram]);
+  }, [clearSilenceTimer, deepgram, setPhase]);
 
   // ─── Matthew's audio recorder hook ───
   const {
@@ -238,6 +249,9 @@ export default function InterviewScreen() {
   const handleStart = async () => {
     if (!state.currentQuestion || activeRef.current) return;
 
+    setSessionId();
+    log.info('Interview starting', { questionId: state.currentQuestion.id, role: state.role, difficulty: state.difficulty });
+
     const audioCtx = new AudioContext();
 
     // Step 1: Prime mic permission inside user gesture, then release.
@@ -247,7 +261,7 @@ export default function InterviewScreen() {
       });
       permissionStream.getTracks().forEach((track) => track.stop());
     } catch (e) {
-      console.error('[Interview] Mic access failed:', e);
+      log.error('Mic access failed', { error: String(e) });
       setStatusText('Microphone access denied. Please allow mic access and try again.');
       void audioCtx.close();
       return;
@@ -259,7 +273,7 @@ export default function InterviewScreen() {
     try {
       await speak(state.currentQuestion.text, state.ttsVoice, state.ttsSpeed);
     } catch (e) {
-      console.error('[Interview] TTS error — continuing without audio:', e);
+      log.error('TTS error — continuing without audio', { error: String(e) });
     }
 
     // Step 2.5: Brief "thinking" pause
@@ -280,7 +294,7 @@ export default function InterviewScreen() {
       micStream = await startRecording(undefined, audioCtx);
       recordingStartRef.current = Date.now();
     } catch (e) {
-      console.error('[Interview] Recording failed:', e);
+      log.error('Recording failed', { error: String(e) });
       setStatusText('Microphone setup failed. Please retry.');
       activeRef.current = false;
       dispatch({ type: 'STOP_RECORDING', payload: new Blob() });
@@ -293,7 +307,7 @@ export default function InterviewScreen() {
       try {
         await deepgram.start(micStream);
       } catch (e) {
-        console.error('[Interview] Deepgram transcription failed:', e);
+        log.error('Deepgram transcription failed', { error: String(e) });
       }
     }
   };
@@ -301,6 +315,7 @@ export default function InterviewScreen() {
   // ─── Matthew's handleDone flow ───
   const handleDone = useCallback(async () => {
     if (finishingRef.current) return;
+    log.info('handleDone called');
 
     const earlyTranscript = deepgram.getFullTranscript();
     const wordCount = earlyTranscript.trim().split(/\s+/).filter(Boolean).length;
@@ -364,15 +379,16 @@ export default function InterviewScreen() {
             },
           });
         } catch (err) {
-          console.error('[Interview] Scoring failed:', err);
+          log.error('Scoring failed', { error: String(err) });
         }
       }
 
+      log.info('Navigating to feedback');
       navigate('/feedback');
     } finally {
       finishingRef.current = false;
     }
-  }, [clearSilenceTimer, dispatch, navigate, deepgram, state.currentQuestion, state.previousAttempts.length, state.resumeData, state.role, state.difficulty, state.speakingDurationSeconds, stopPlayback, stopRecording]);
+  }, [clearSilenceTimer, dispatch, navigate, deepgram, state.currentQuestion, state.previousAttempts.length, state.resumeData, state.role, state.difficulty, state.speakingDurationSeconds, stopPlayback, stopRecording, setPhase]);
 
   useEffect(() => {
     handleDoneRef.current = handleDone;
@@ -463,8 +479,6 @@ export default function InterviewScreen() {
 
   // Derive micEnabled for WaveformVisualizer from phase
   const micEnabled = phase === 'recording' || phase === 'silence-detected' || phase === 'asking-done';
-
-  const showTranscript = phase === 'recording' || phase === 'silence-detected' || phase === 'asking-done';
 
   // ─── Phase badge config ───
   const phaseLabel: Record<ScreenPhase, string> = {

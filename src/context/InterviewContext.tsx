@@ -1,6 +1,9 @@
 import { createContext, useContext, useReducer, useMemo, useEffect } from 'react';
 import type { ReactNode, Dispatch } from 'react';
 import type { InterviewState, InterviewAction, Session } from '../types';
+import { createLogger, withReducerLogging } from '../utils/logger';
+
+const log = createLogger('Context');
 
 const STORAGE_KEY_SESSIONS = 'polyprompts-sessions';
 const STORAGE_KEY_PREFS = 'polyprompts-prefs';
@@ -104,7 +107,8 @@ export function InterviewProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const [state, dispatch] = useReducer(interviewReducer, {
+  const loggedReducer = useMemo(() => withReducerLogging(interviewReducer, log), []);
+  const [state, dispatch] = useReducer(loggedReducer, {
     ...initialState,
     sessionHistory: savedSessions,
     ...(savedPrefs.role ? { role: savedPrefs.role } : {}),
@@ -115,11 +119,17 @@ export function InterviewProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(state.sessionHistory));
+    log.debug('Persisted sessions', { count: state.sessionHistory.length });
   }, [state.sessionHistory]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_PREFS, JSON.stringify({ role: state.role, difficulty: state.difficulty, ttsVoice: state.ttsVoice, ttsSpeed: state.ttsSpeed }));
+    log.debug('Persisted prefs', { role: state.role, difficulty: state.difficulty });
   }, [state.role, state.difficulty, state.ttsVoice, state.ttsSpeed]);
+
+  useEffect(() => {
+    log.info('Provider mounted', { savedSessions: savedSessions.length });
+  }, [savedSessions.length]);
 
   return (
     <InterviewContext.Provider value={{ state, dispatch }}>

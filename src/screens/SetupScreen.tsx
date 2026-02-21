@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useInterview } from '../context/InterviewContext';
 import { seededQuestions } from '../data/questions';
 import type { Difficulty, Role } from '../types';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('Setup');
 
 /* ─────────────────────────────────────────────
    DATA
@@ -1120,6 +1123,7 @@ export default function SetupScreen() {
   const handleStart = () => {
     if (!canStart || launching || !role) return;
     setLaunching(true);
+    log.info('Interview starting', { role, difficulty, category, mode, hasResume: !!resumeData });
 
     const mappedRole = toInterviewRole(role);
     dispatch({ type: 'SET_ROLE', payload: mappedRole });

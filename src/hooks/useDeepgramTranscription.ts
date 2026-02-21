@@ -1,4 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('Deepgram');
 
 /**
  * Real-time transcription via Deepgram WebSocket streaming.
@@ -35,15 +38,25 @@ export function useDeepgramTranscription() {
     setFinalTranscript('');
     setInterimTranscript('');
 
-    // 1. Fetch a short-lived Deepgram key from our serverless endpoint
-    let dgKey: string;
+    // 1. Get Deepgram API key — use serverless endpoint in production,
+    //    fall back to VITE_DEEPGRAM_API_KEY env var in local dev
+    let dgKey: string | undefined;
+    const stopKeyExchange = log.time('keyExchange');
     try {
       const res = await fetch('/api/key', { method: 'POST' });
-      const data = await res.json();
-      dgKey = data.key;
-      if (!dgKey) throw new Error('Empty key from /api/key');
-    } catch (err) {
-      console.error('[Deepgram] Failed to fetch key:', err);
+      if (res.ok) {
+        const data = await res.json();
+        dgKey = data.key;
+      }
+    } catch {
+      // /api/key not available (local dev) — fall through
+    }
+    stopKeyExchange();
+    if (!dgKey) {
+      dgKey = import.meta.env.VITE_DEEPGRAM_API_KEY;
+    }
+    if (!dgKey) {
+      log.error('No API key available. Set VITE_DEEPGRAM_API_KEY in .env for local dev.');
       return;
     }
 
@@ -52,9 +65,10 @@ export function useDeepgramTranscription() {
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log('[Deepgram] WebSocket connected');
+      log.info('WebSocket connected');
     };
 
+    let finalCount = 0;
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
@@ -65,8 +79,12 @@ export function useDeepgramTranscription() {
         if (!text) return;
 
         if (msg.is_final) {
+          finalCount++;
           setFinalTranscript((prev) => (prev ? prev + ' ' + text : text));
           setInterimTranscript('');
+          if (finalCount % 5 === 0) {
+            log.debug('Transcript accumulation', { finalResults: finalCount });
+          }
         } else {
           setInterimTranscript(text);
         }
@@ -76,11 +94,11 @@ export function useDeepgramTranscription() {
     };
 
     ws.onerror = (err) => {
-      console.error('[Deepgram] WebSocket error:', err);
+      log.error('WebSocket error', { error: String(err) });
     };
 
     ws.onclose = (ev) => {
-      console.log('[Deepgram] WebSocket closed', ev.code, ev.reason);
+      log.info('WebSocket closed', { code: ev.code, reason: ev.reason });
     };
 
     // 3. Set up AudioContext at 16 kHz to produce Int16 PCM for Deepgram
@@ -108,7 +126,7 @@ export function useDeepgramTranscription() {
     source.connect(processor);
     processor.connect(audioCtx.destination);
 
-    console.log('[Deepgram] Audio pipeline started (16 kHz Int16 PCM)');
+    log.info('Audio pipeline started', { sampleRate: 16000, encoding: 'Int16 PCM' });
   }, []);
 
   // ─── stop ─────────────────────────────────────────────────────────────
@@ -139,7 +157,7 @@ export function useDeepgramTranscription() {
       wsRef.current = null;
     }
 
-    console.log('[Deepgram] Stopped');
+    log.info('Stopped');
   }, []);
 
   // ─── getFullTranscript ────────────────────────────────────────────────
