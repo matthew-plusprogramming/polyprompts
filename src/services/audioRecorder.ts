@@ -6,6 +6,10 @@
  * the full audio blob (sent to Whisper for transcription).
  */
 
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('Recorder');
+
 export interface RecorderCallbacks {
   onMicDisconnect: () => void;
   onError: (error: Error) => void;
@@ -47,7 +51,7 @@ export function createAudioRecorder(callbacks: RecorderCallbacks): AudioRecorder
 
     // Watch for mic disconnection
     trackEndedHandler = () => {
-      console.warn('[Recorder] Audio track ended (mic disconnected?)');
+      log.warn('Audio track ended (mic disconnected?)');
       callbacks.onMicDisconnect();
     };
     tracks[0].addEventListener('ended', trackEndedHandler);
@@ -67,13 +71,13 @@ export function createAudioRecorder(callbacks: RecorderCallbacks): AudioRecorder
     };
 
     mediaRecorder.onerror = (event) => {
-      console.error('[Recorder] MediaRecorder error:', event);
+      log.error('MediaRecorder error', { error: String(event) });
       callbacks.onError(new Error('MediaRecorder error during recording'));
     };
 
     try {
       mediaRecorder.start(1000);
-      console.log('[Recorder] Started, mimeType:', recorderMimeType || 'browser default');
+      log.info('Started', { mimeType: recorderMimeType || 'browser default' });
     } catch (err) {
       callbacks.onError(new Error(`MediaRecorder.start() failed: ${err}`));
       mediaRecorder = null;
@@ -95,27 +99,32 @@ export function createAudioRecorder(callbacks: RecorderCallbacks): AudioRecorder
     }
 
     return new Promise<Blob>((resolve) => {
+      const resolveWithLog = (blob: Blob) => {
+        log.info('Stopped', { blobSize: blob.size, chunkCount: chunks.length });
+        resolve(blob);
+      };
+
       if (!mediaRecorder || mediaRecorder.state === 'inactive') {
-        resolve(new Blob(chunks, { type: outputType }));
+        resolveWithLog(new Blob(chunks, { type: outputType }));
         return;
       }
 
       // Timeout guard — don't hang forever if MediaRecorder misbehaves
       const timeout = setTimeout(() => {
-        console.warn('[Recorder] stop() timed out, resolving with partial data');
-        resolve(new Blob(chunks, { type: outputType }));
+        log.warn('stop() timed out, resolving with partial data');
+        resolveWithLog(new Blob(chunks, { type: outputType }));
       }, STOP_TIMEOUT_MS);
 
       mediaRecorder.onstop = () => {
         clearTimeout(timeout);
-        resolve(new Blob(chunks, { type: outputType }));
+        resolveWithLog(new Blob(chunks, { type: outputType }));
       };
 
       try {
         mediaRecorder.stop();
       } catch {
         clearTimeout(timeout);
-        resolve(new Blob(chunks, { type: outputType }));
+        resolveWithLog(new Blob(chunks, { type: outputType }));
       }
 
       mediaRecorder = null;

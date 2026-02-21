@@ -1,4 +1,7 @@
 import type { ScoringResult } from '../types';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('OpenAI');
 
 export interface ResumeData {
   skills: string[];
@@ -26,7 +29,10 @@ const ttsCache = new Map<string, Blob>();
 export async function textToSpeech(text: string, voice: string = 'alloy', speed: number = 1.0): Promise<Blob> {
   const cacheKey = voice + ':' + speed + ':' + text;
   const cached = ttsCache.get(cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    log.debug('TTS cache hit', { voice, speed });
+    return cached;
+  }
 
   const openai = await getClient();
   const response = await openai.audio.speech.create({
@@ -48,7 +54,8 @@ export async function textToSpeech(text: string, voice: string = 'alloy', speed:
 //   'definitely_still_talking' — stay silent, don't interrupt (extremely high confidence)
 //   'ask'                      — ask the user if they're finished (anything in between)
 export async function analyzePause(transcript: string): Promise<'definitely_done' | 'definitely_still_talking' | 'ask'> {
-  console.log('[analyzePause] Called with transcript:', JSON.stringify(transcript));
+  const stopTimer = log.time('analyzePause');
+  log.info('analyzePause called', { transcriptLength: transcript.length });
   const openai = await getClient();
   const response = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
@@ -94,7 +101,8 @@ Return "ask" for EVERYTHING else. When in doubt, always return "ask". The interv
 
   const parsed = JSON.parse(response.choices[0]?.message?.content ?? '{}');
   const verdict = parsed.verdict;
-  console.log('[analyzePause] Verdict:', verdict);
+  stopTimer();
+  log.info('analyzePause verdict', { verdict });
   if (verdict === 'definitely_done') return 'definitely_done';
   if (verdict === 'definitely_still_talking') return 'definitely_still_talking';
   return 'ask';
@@ -425,6 +433,7 @@ async function attemptScore(
   question: string,
   resumeData?: ResumeData,
 ): Promise<ScoringResult> {
+  const stopTimer = log.time('attemptScore');
   const timeoutPromise = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error('Scoring timed out after 30 seconds')), 30000)
   );
@@ -463,6 +472,7 @@ async function attemptScore(
 
   // With structured outputs the schema is enforced, but we still validate
   // in case of edge cases (e.g. refusal, truncation)
+  stopTimer();
   return validateScoringResult(parsed);
 }
 
@@ -473,6 +483,7 @@ export async function generateResumeQuestion(
   difficulty: string,
   category?: string,
 ): Promise<{ text: string; category: string }> {
+  const stopTimer = log.time('generateResumeQuestion');
   const openai = await getClient();
 
   const categoryInstruction =
@@ -527,6 +538,7 @@ Return JSON: { "text": "the question", "category": "the category tag" }`;
   }
 
   const result = parsed as { text: string; category?: string };
+  stopTimer();
   return {
     text: result.text,
     category:
@@ -546,7 +558,7 @@ export async function scoreAnswer(
   try {
     return await attemptScore(openai, transcript, question, resumeData);
   } catch (firstError) {
-    console.warn('scoreAnswer: first attempt failed, retrying in 1s.', firstError);
+    log.warn('scoreAnswer: first attempt failed, retrying in 1s', { error: String(firstError) });
     await new Promise((r) => setTimeout(r, 1000));
     try {
       return await attemptScore(openai, transcript, question, resumeData);

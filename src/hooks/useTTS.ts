@@ -1,5 +1,8 @@
 import { useState, useRef, useCallback } from 'react';
 import { textToSpeech } from '../services/openai';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('TTS');
 
 const PLAYBACK_TIMEOUT_MS = 8000;
 const MAX_RETRIES = 2;
@@ -48,7 +51,7 @@ export function useTTS() {
         return await textToSpeech(text, voice, speed);
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
-        console.warn(`[TTS] Fetch attempt ${attempt + 1} failed:`, lastError.message);
+        log.warn(`Fetch attempt ${attempt + 1} failed`, { error: lastError.message });
         if (attempt < MAX_RETRIES) {
           await new Promise((r) => setTimeout(r, RETRY_BACKOFF_MS * (attempt + 1)));
         }
@@ -69,7 +72,7 @@ export function useTTS() {
 
       // Timeout: if audio doesn't start playing within threshold, reject
       const playbackTimeout = setTimeout(() => {
-        console.warn('[TTS] Playback timeout — audio did not start in time');
+        log.warn('Playback timeout — audio did not start in time');
         reject(new Error('Playback timeout'));
       }, PLAYBACK_TIMEOUT_MS);
 
@@ -79,7 +82,7 @@ export function useTTS() {
       };
 
       audio.onended = () => {
-        console.log('[TTS] Playback ended');
+        log.info('Playback ended');
         resolve();
       };
 
@@ -97,22 +100,26 @@ export function useTTS() {
     window.speechSynthesis?.cancel();
 
     setIsPlaying(true);
+    const stopSpeak = log.time('speak');
     try {
-      console.log('[TTS] Fetching audio...');
+      log.info('Fetching audio...');
+      const stopFetch = log.time('tts-fetch');
       const blob = await fetchWithRetry(text, voice, speed);
-      console.log('[TTS] Got blob, size:', blob.size, 'type:', blob.type);
+      stopFetch();
+      log.info('Got blob', { size: blob.size, type: blob.type });
 
-      console.log('[TTS] Playing...');
+      log.info('Playing...');
       await playBlob(blob);
     } catch (error) {
-      console.error('[TTS] OpenAI TTS failed, falling back to speechSynthesis:', error);
+      log.error('OpenAI TTS failed, falling back to speechSynthesis', { error: String(error) });
       try {
         await speakWithNativeFallback(text);
       } catch (fallbackError) {
-        console.error('[TTS] Native fallback also failed:', fallbackError);
+        log.error('Native fallback also failed', { error: String(fallbackError) });
         throw fallbackError;
       }
     } finally {
+      stopSpeak();
       setIsPlaying(false);
       cleanupAudio();
     }
