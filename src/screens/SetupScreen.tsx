@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, type DragEvent, type ReactNod
 import { useNavigate } from 'react-router-dom';
 import { useInterview } from '../context/InterviewContext';
 import { loadQuestions } from '../services/questionLoader';
+import { prefetchTTS } from '../services/openai';
 import type { Difficulty, Role } from '../types';
 import { createLogger } from '../utils/logger';
 
@@ -1143,6 +1144,13 @@ export default function SetupScreen() {
       log.info('Questions loaded', { count: questions.length, ids: questions.map(q => q.id) });
       if (questions.length > 0) {
         dispatch({ type: 'SET_QUESTIONS', payload: questions });
+        // Fire-and-forget: prefetch TTS audio for all questions + transition/nudge phrases
+        const textsToCache = questions.map(q => q.text);
+        if (questions.length > 1) {
+          textsToCache.push("Great, let's move on to the next question.");
+        }
+        textsToCache.push("It sounds like you might be wrapping up. Are you finished with your answer, or would you like to continue?");
+        prefetchTTS(textsToCache);
       } else {
         log.warn('No questions matched filters', { role: mappedRole, difficulty, category });
       }

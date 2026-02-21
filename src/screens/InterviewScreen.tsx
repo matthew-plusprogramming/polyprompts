@@ -4,7 +4,7 @@ import { useInterview } from '../context/InterviewContext';
 import { useTTS } from '../hooks/useTTS';
 import { useDeepgramTranscription } from '../hooks/useDeepgramTranscription';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
-import { analyzePause, scoreAnswer } from '../services/openai';
+import { analyzePause, scoreAnswer, prefetchTTS } from '../services/openai';
 import { countFillers } from '../hooks/useFillerDetection';
 import type { QuestionResult } from '../types';
 import WaveformVisualizer from '../components/WaveformVisualizer';
@@ -164,12 +164,16 @@ export default function InterviewScreen() {
 
   const handleSpeechStart = useCallback(() => {
     clearSilenceTimer();
-    if (!analyzingRef.current && activeRef.current) {
-      setSilenceMessage(undefined);
-      setStatusText('Listening...');
-      setPhase('recording');
+    if (!activeRef.current) return;
+    // If the nudge TTS is playing (or analyzePause is in-flight), cut it off
+    if (analyzingRef.current) {
+      stopPlayback();
+      analyzingRef.current = false;
     }
-  }, [clearSilenceTimer, setPhase]);
+    setSilenceMessage(undefined);
+    setStatusText('Listening...');
+    setPhase('recording');
+  }, [clearSilenceTimer, setPhase, stopPlayback]);
 
   const handleSilenceStart = useCallback(async () => {
     if (!activeRef.current || analyzingRef.current) return;
@@ -187,6 +191,9 @@ export default function InterviewScreen() {
 
     try {
       const decision = await analyzePause(transcript);
+
+      // User may have resumed speaking while analyzePause was in-flight
+      if (!analyzingRef.current) return;
 
       if (decision === 'definitely_done') {
         analyzingRef.current = false;
@@ -566,6 +573,20 @@ export default function InterviewScreen() {
     }
   }, [state.questions.length, state.currentQuestion, navigate]);
 
+  // Prefetch next question TTS during recording (safety net if SetupScreen prefetch didn't finish)
+  useEffect(() => {
+    if (phase !== 'recording') return;
+    const nextIdx = state.currentQuestionIndex + 1;
+    const nextQuestion = state.questions[nextIdx];
+    if (!nextQuestion) return;
+
+    const texts = [
+      "Great, let's move on to the next question.",
+      nextQuestion.text,
+      "It sounds like you might be wrapping up. Are you finished with your answer, or would you like to continue?",
+    ];
+    prefetchTTS(texts, state.ttsVoice, state.ttsSpeed);
+  }, [phase, state.currentQuestionIndex, state.questions, state.ttsVoice, state.ttsSpeed]);
 
   // Keep context transcript in sync
   useEffect(() => {
@@ -970,156 +991,323 @@ export default function InterviewScreen() {
         </div>
       )}
 
-      {/* ── Two-column body: Video feed + Waveform ── */}
-      <div
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
-          gridTemplateRows: 'minmax(0, 1fr)',
-          alignItems: 'stretch',
-          gap: '0.75rem',
-          marginBottom: '0.75rem',
-          flex: '1 1 auto',
-          minHeight: 0,
-          overflow: 'hidden',
-        }}
-      >
-        {/* Left: Video feed (main's design) */}
-        <section
+      {/* ── Body: Full-screen scoring view when finished, otherwise normal layout ── */}
+      {phase === 'finished' ? (
+        <div
           style={{
-            minHeight: 0,
-            height: '100%',
-            boxSizing: 'border-box',
-            border: '1px solid rgba(255, 255, 255, 0.14)',
-            borderRadius: '22px 10px 22px 10px',
-            overflow: 'hidden',
-            background: 'linear-gradient(165deg, rgba(10, 20, 37, 0.88), rgba(6, 12, 23, 0.95))',
-            color: '#f7f7f7',
             position: 'relative',
-            boxShadow: 'inset 0 0 26px rgba(255, 255, 255, 0.05), 0 10px 24px rgba(0, 0, 0, 0.35)',
+            zIndex: 1,
+            flex: '1 1 auto',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '24px',
+            animation: 'fadeIn 0.4s ease',
           }}
         >
-          <video
-            ref={videoRef}
-            muted
-            playsInline
-            autoPlay
-            controls={false}
-            disablePictureInPicture
-            disableRemotePlayback
-            onContextMenu={(e) => e.preventDefault()}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              transform: 'scaleX(-1)',
-              display: cameraStatus === 'ready' && cameraEnabled ? 'block' : 'none',
-              pointerEvents: 'none',
-            }}
-          />
-
-          {(cameraStatus !== 'ready' || !cameraEnabled) && (
+          {/* Spinner */}
+          <div style={{ position: 'relative', width: '64px', height: '64px' }}>
             <div
               style={{
                 position: 'absolute',
                 inset: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center',
-                padding: '1rem',
+                borderRadius: '50%',
+                border: '3px solid rgba(99,102,241,0.12)',
+                borderTopColor: '#6366f1',
+                animation: 'spin 0.8s linear infinite',
               }}
-            >
-              <div>
-                <strong>Your Video</strong>
-                <p style={{ marginTop: '0.5rem', color: '#d0d0d0' }}>
-                  {!cameraEnabled && 'Camera is off.'}
-                  {cameraStatus === 'loading' && cameraEnabled && 'Requesting camera access...'}
-                  {cameraStatus === 'unsupported' && cameraEnabled && 'Camera is not supported in this browser.'}
-                  {cameraStatus === 'error' && cameraEnabled && `Camera unavailable: ${cameraError}`}
-                </p>
-                {(cameraStatus === 'error' || cameraStatus === 'unsupported') && cameraEnabled && (
-                  <button
-                    type="button"
-                    onClick={() => void requestCamera()}
-                    style={{
-                      marginTop: '0.65rem',
-                      padding: '0.4rem 0.7rem',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(255, 255, 255, 0.22)',
-                      background: 'rgba(255, 255, 255, 0.06)',
-                      color: '#f2f2f2',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Retry Camera
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Mic / Camera toggle buttons */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '12px',
-              bottom: '12px',
-              display: 'flex',
-              gap: '8px',
-              zIndex: 2,
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setCameraEnabled((prev) => {
-                const next = !prev;
-                if (next && !streamRef.current) {
-                  void requestCamera();
-                }
-                return next;
-              })}
-              style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '999px',
-                border: cameraEnabled ? '1px solid rgba(255, 255, 255, 0.28)' : '1px solid rgba(190, 190, 190, 0.35)',
-                background: cameraEnabled ? 'rgba(18, 18, 18, 0.9)' : 'rgba(42, 42, 42, 0.9)',
-                color: '#fff',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              aria-label={cameraEnabled ? 'Turn camera off' : 'Turn camera on'}
-              title={cameraEnabled ? 'Turn camera off' : 'Turn camera on'}
-            >
-              <img
-                src={cameraEnabled ? cameraOnIcon : cameraOffIcon}
-                alt={cameraEnabled ? 'Camera on' : 'Camera off'}
-                style={{ width: '20px', height: '20px', objectFit: 'contain' }}
-              />
-            </button>
-          </div>
-
-          {/* VAD speaking indicator overlay */}
-          {isRecording && (
+            />
             <div
               style={{
                 position: 'absolute',
-                top: '12px',
-                left: '12px',
-                display: 'inline-flex',
+                inset: '6px',
+                borderRadius: '50%',
+                border: '3px solid rgba(34,211,238,0.1)',
+                borderBottomColor: '#22d3ee',
+                animation: 'spin 1.2s linear infinite reverse',
+              }}
+            />
+          </div>
+
+          {/* Status text */}
+          <div style={{ textAlign: 'center' }}>
+            <p
+              style={{
+                margin: 0,
+                fontFamily: "'Unbounded', 'Space Grotesk', sans-serif",
+                fontSize: '1.15rem',
+                fontWeight: 700,
+                color: '#e2e8f0',
+                letterSpacing: '0.04em',
+              }}
+            >
+              Analyzing your answers&hellip;
+            </p>
+            <p
+              style={{
+                margin: '10px 0 0',
+                fontSize: '14px',
+                color: '#64748b',
+              }}
+            >
+              {state.questions.length > 1
+                ? `Scoring ${state.questions.length} responses`
+                : 'Scoring your response'}
+            </p>
+          </div>
+
+          {/* Question progress dots */}
+          {state.questions.length > 1 && (
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              {state.questions.map((_, i) => {
+                const result = state.questionResults[i];
+                const scored = result?.scoringResult != null;
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '50%',
+                      background: scored
+                        ? '#22d3ee'
+                        : 'rgba(99,102,241,0.25)',
+                      boxShadow: scored
+                        ? '0 0 8px rgba(34,211,238,0.5)'
+                        : 'none',
+                      transition: 'all 0.3s ease',
+                    }}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* ── Two-column body: Video feed + Waveform ── */}
+          <div
+            style={{
+              position: 'relative',
+              zIndex: 1,
+              display: 'grid',
+              gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+              gridTemplateRows: 'minmax(0, 1fr)',
+              alignItems: 'stretch',
+              gap: '0.75rem',
+              marginBottom: '0.75rem',
+              flex: '1 1 auto',
+              minHeight: 0,
+              overflow: 'hidden',
+            }}
+          >
+            {/* Left: Video feed (main's design) */}
+            <section
+              style={{
+                minHeight: 0,
+                height: '100%',
+                boxSizing: 'border-box',
+                border: '1px solid rgba(255, 255, 255, 0.14)',
+                borderRadius: '22px 10px 22px 10px',
+                overflow: 'hidden',
+                background: 'linear-gradient(165deg, rgba(10, 20, 37, 0.88), rgba(6, 12, 23, 0.95))',
+                color: '#f7f7f7',
+                position: 'relative',
+                boxShadow: 'inset 0 0 26px rgba(255, 255, 255, 0.05), 0 10px 24px rgba(0, 0, 0, 0.35)',
+              }}
+            >
+              <video
+                ref={videoRef}
+                muted
+                playsInline
+                autoPlay
+                controls={false}
+                disablePictureInPicture
+                disableRemotePlayback
+                onContextMenu={(e) => e.preventDefault()}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  transform: 'scaleX(-1)',
+                  display: cameraStatus === 'ready' && cameraEnabled ? 'block' : 'none',
+                  pointerEvents: 'none',
+                }}
+              />
+
+              {(cameraStatus !== 'ready' || !cameraEnabled) && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    textAlign: 'center',
+                    padding: '1rem',
+                  }}
+                >
+                  <div>
+                    <strong>Your Video</strong>
+                    <p style={{ marginTop: '0.5rem', color: '#d0d0d0' }}>
+                      {!cameraEnabled && 'Camera is off.'}
+                      {cameraStatus === 'loading' && cameraEnabled && 'Requesting camera access...'}
+                      {cameraStatus === 'unsupported' && cameraEnabled && 'Camera is not supported in this browser.'}
+                      {cameraStatus === 'error' && cameraEnabled && `Camera unavailable: ${cameraError}`}
+                    </p>
+                    {(cameraStatus === 'error' || cameraStatus === 'unsupported') && cameraEnabled && (
+                      <button
+                        type="button"
+                        onClick={() => void requestCamera()}
+                        style={{
+                          marginTop: '0.65rem',
+                          padding: '0.4rem 0.7rem',
+                          borderRadius: '8px',
+                          border: '1px solid rgba(255, 255, 255, 0.22)',
+                          background: 'rgba(255, 255, 255, 0.06)',
+                          color: '#f2f2f2',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Retry Camera
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Mic / Camera toggle buttons */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  bottom: '12px',
+                  display: 'flex',
+                  gap: '8px',
+                  zIndex: 2,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setCameraEnabled((prev) => {
+                    const next = !prev;
+                    if (next && !streamRef.current) {
+                      void requestCamera();
+                    }
+                    return next;
+                  })}
+                  style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '999px',
+                    border: cameraEnabled ? '1px solid rgba(255, 255, 255, 0.28)' : '1px solid rgba(190, 190, 190, 0.35)',
+                    background: cameraEnabled ? 'rgba(18, 18, 18, 0.9)' : 'rgba(42, 42, 42, 0.9)',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  aria-label={cameraEnabled ? 'Turn camera off' : 'Turn camera on'}
+                  title={cameraEnabled ? 'Turn camera off' : 'Turn camera on'}
+                >
+                  <img
+                    src={cameraEnabled ? cameraOnIcon : cameraOffIcon}
+                    alt={cameraEnabled ? 'Camera on' : 'Camera off'}
+                    style={{ width: '20px', height: '20px', objectFit: 'contain' }}
+                  />
+                </button>
+              </div>
+
+              {/* VAD speaking indicator overlay */}
+              {isRecording && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '12px',
+                    left: '12px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '4px 10px',
+                    background: userSpeaking ? 'rgba(34,197,94,0.15)' : 'rgba(148,163,184,0.08)',
+                    border: `1px solid ${userSpeaking ? 'rgba(34,197,94,0.35)' : 'rgba(148,163,184,0.18)'}`,
+                    borderRadius: '999px',
+                    transition: 'background 0.2s ease, border-color 0.2s ease',
+                    zIndex: 2,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '7px',
+                      height: '7px',
+                      borderRadius: '50%',
+                      background: userSpeaking ? '#22c55e' : '#64748b',
+                      boxShadow: userSpeaking ? '0 0 6px rgba(34,197,94,0.6)' : 'none',
+                      transition: 'all 0.15s ease',
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontFamily: "'DM Mono', monospace",
+                      fontSize: '10px',
+                      fontWeight: '600',
+                      letterSpacing: '0.06em',
+                      color: userSpeaking ? '#4ade80' : '#64748b',
+                      transition: 'color 0.15s ease',
+                    }}
+                  >
+                    {userSpeaking ? 'SPEAKING' : 'LISTENING'}
+                  </span>
+                </div>
+              )}
+            </section>
+
+            {/* Right: Waveform Visualizer (main's component) */}
+            <section
+              style={{
+                minHeight: 0,
+                height: '100%',
+                boxSizing: 'border-box',
+                border: '1px solid rgba(255, 255, 255, 0.14)',
+                borderRadius: '10px 22px 10px 22px',
+                background: 'linear-gradient(160deg, rgba(12, 22, 34, 0.95), rgba(8, 16, 27, 0.98))',
+                color: '#f0f0f0',
+                padding: '1.15rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.95rem',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '4px 10px',
-                background: userSpeaking ? 'rgba(34,197,94,0.15)' : 'rgba(148,163,184,0.08)',
-                border: `1px solid ${userSpeaking ? 'rgba(34,197,94,0.35)' : 'rgba(148,163,184,0.18)'}`,
-                borderRadius: '999px',
-                transition: 'background 0.2s ease, border-color 0.2s ease',
-                zIndex: 2,
+                justifyContent: 'center',
+                overflow: 'hidden',
+                boxShadow: 'inset 0 0 26px rgba(255, 255, 255, 0.05), 0 10px 24px rgba(0, 0, 0, 0.35)',
+              }}
+            >
+              <div style={{ width: 'calc(100% + 2.3rem)', marginLeft: '-1.15rem', marginRight: '-1.15rem' }}>
+                <WaveformVisualizer height={285} micEnabled={micEnabled} />
+              </div>
+            </section>
+          </div>
+
+          {/* ── Phase-specific overlays (matthew's logic) ── */}
+
+          {/* Speaking-question overlay */}
+          {phase === 'speaking-question' && (
+            <div
+              style={{
+                position: 'relative',
+                zIndex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                padding: '12px 24px',
+                marginBottom: '0.5rem',
+                background: 'rgba(167,139,250,0.07)',
+                border: '1px solid rgba(167,139,250,0.18)',
+                borderRadius: '14px',
+                animation: 'fadeIn 0.3s ease',
               }}
             >
               <div
@@ -1127,368 +1315,268 @@ export default function InterviewScreen() {
                   width: '7px',
                   height: '7px',
                   borderRadius: '50%',
-                  background: userSpeaking ? '#22c55e' : '#64748b',
-                  boxShadow: userSpeaking ? '0 0 6px rgba(34,197,94,0.6)' : 'none',
-                  transition: 'all 0.15s ease',
+                  background: '#a78bfa',
+                  flexShrink: 0,
+                  animation: 'pulse-ring 1.2s ease-out infinite',
                 }}
               />
               <span
                 style={{
-                  fontFamily: "'DM Mono', monospace",
-                  fontSize: '10px',
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontSize: '14px',
                   fontWeight: '600',
-                  letterSpacing: '0.06em',
-                  color: userSpeaking ? '#4ade80' : '#64748b',
-                  transition: 'color 0.15s ease',
+                  color: '#c4b5fd',
+                  letterSpacing: '0.01em',
                 }}
               >
-                {userSpeaking ? 'SPEAKING' : 'LISTENING'}
+                Interviewer is asking your question aloud&hellip;
               </span>
             </div>
           )}
-        </section>
 
-        {/* Right: Waveform Visualizer (main's component) */}
-        <section
-          style={{
-            minHeight: 0,
-            height: '100%',
-            boxSizing: 'border-box',
-            border: '1px solid rgba(255, 255, 255, 0.14)',
-            borderRadius: '10px 22px 10px 22px',
-            background: 'linear-gradient(160deg, rgba(12, 22, 34, 0.95), rgba(8, 16, 27, 0.98))',
-            color: '#f0f0f0',
-            padding: '1.15rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.95rem',
-            alignItems: 'center',
-            justifyContent: 'center',
-            overflow: 'hidden',
-            boxShadow: 'inset 0 0 26px rgba(255, 255, 255, 0.05), 0 10px 24px rgba(0, 0, 0, 0.35)',
-          }}
-        >
-          <div style={{ width: 'calc(100% + 2.3rem)', marginLeft: '-1.15rem', marginRight: '-1.15rem' }}>
-            <WaveformVisualizer height={285} micEnabled={micEnabled} />
-          </div>
-        </section>
-      </div>
-
-      {/* ── Phase-specific overlays (matthew's logic) ── */}
-
-      {/* Speaking-question overlay */}
-      {phase === 'speaking-question' && (
-        <div
-          style={{
-            position: 'relative',
-            zIndex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '10px',
-            padding: '12px 24px',
-            marginBottom: '0.5rem',
-            background: 'rgba(167,139,250,0.07)',
-            border: '1px solid rgba(167,139,250,0.18)',
-            borderRadius: '14px',
-            animation: 'fadeIn 0.3s ease',
-          }}
-        >
-          <div
-            style={{
-              width: '7px',
-              height: '7px',
-              borderRadius: '50%',
-              background: '#a78bfa',
-              flexShrink: 0,
-              animation: 'pulse-ring 1.2s ease-out infinite',
-            }}
-          />
-          <span
-            style={{
-              fontFamily: "'Space Grotesk', sans-serif",
-              fontSize: '14px',
-              fontWeight: '600',
-              color: '#c4b5fd',
-              letterSpacing: '0.01em',
-            }}
-          >
-            Interviewer is asking your question aloud&hellip;
-          </span>
-        </div>
-      )}
-
-      {/* Transitioning overlay */}
-      {phase === 'transitioning' && (
-        <div
-          style={{
-            position: 'relative',
-            zIndex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '10px',
-            padding: '12px 24px',
-            marginBottom: '0.5rem',
-            background: 'rgba(167,139,250,0.07)',
-            border: '1px solid rgba(167,139,250,0.18)',
-            borderRadius: '14px',
-            animation: 'fadeIn 0.3s ease',
-          }}
-        >
-          <div
-            style={{
-              width: '7px',
-              height: '7px',
-              borderRadius: '50%',
-              background: '#a78bfa',
-              flexShrink: 0,
-              animation: 'pulse-ring 1.2s ease-out infinite',
-            }}
-          />
-          <span
-            style={{
-              fontFamily: "'Space Grotesk', sans-serif",
-              fontSize: '14px',
-              fontWeight: '600',
-              color: '#c4b5fd',
-              letterSpacing: '0.01em',
-            }}
-          >
-            Moving to the next question&hellip;
-          </span>
-        </div>
-      )}
-
-      {/* Thinking pause overlay */}
-      {phase === 'thinking' && (
-        <div
-          style={{
-            position: 'relative',
-            zIndex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '10px',
-            padding: '12px 24px',
-            marginBottom: '0.5rem',
-            background: 'rgba(129,140,248,0.07)',
-            border: '1px solid rgba(129,140,248,0.18)',
-            borderRadius: '14px',
-            animation: 'breathing 2s ease-in-out infinite',
-          }}
-        >
-          <div
-            style={{
-              width: '7px',
-              height: '7px',
-              borderRadius: '50%',
-              background: '#818cf8',
-              flexShrink: 0,
-              opacity: 0.8,
-            }}
-          />
-          <span
-            style={{
-              fontFamily: "'Space Grotesk', sans-serif",
-              fontSize: '14px',
-              fontWeight: '600',
-              color: '#a5b4fc',
-              letterSpacing: '0.01em',
-            }}
-          >
-            Take a moment to collect your thoughts&hellip;
-          </span>
-        </div>
-      )}
-
-      {/* Mic error panel */}
-      {phase === 'mic-error' && (
-        <div
-          style={{
-            position: 'relative',
-            zIndex: 1,
-            padding: '20px 24px',
-            marginBottom: '0.5rem',
-            background: 'rgba(248,113,113,0.07)',
-            border: '1px solid rgba(248,113,113,0.22)',
-            borderRadius: '14px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-            alignItems: 'center',
-            textAlign: 'center',
-          }}
-        >
-          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#f87171' }}>
-            Microphone Disconnected
-          </h3>
-          <p style={{ margin: 0, fontSize: '14px', color: '#fca5a5' }}>
-            Your microphone was disconnected during recording.
-          </p>
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '8px' }}>
-            <button
-              onClick={handleStart}
-              disabled={!state.currentQuestion}
+          {/* Transitioning overlay */}
+          {phase === 'transitioning' && (
+            <div
               style={{
-                padding: '10px 24px',
-                borderRadius: '10px',
-                border: '1px solid rgba(99,102,241,0.4)',
-                background: 'rgba(99,102,241,0.15)',
-                color: '#a5b4fc',
-                fontSize: '14px',
-                fontWeight: '700',
-                cursor: state.currentQuestion ? 'pointer' : 'not-allowed',
+                position: 'relative',
+                zIndex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                padding: '12px 24px',
+                marginBottom: '0.5rem',
+                background: 'rgba(167,139,250,0.07)',
+                border: '1px solid rgba(167,139,250,0.18)',
+                borderRadius: '14px',
+                animation: 'fadeIn 0.3s ease',
               }}
             >
-              Retry with Mic
-            </button>
-            <button
-              onClick={() => {
-                const transcript = deepgram.getFullTranscript().trim();
-                if (transcript.length > 10) {
-                  void handleDone();
-                } else {
-                  navigate('/');
-                }
-              }}
-              style={{
-                padding: '10px 24px',
-                borderRadius: '10px',
-                border: '1px solid rgba(248,113,113,0.3)',
-                background: 'rgba(248,113,113,0.1)',
-                color: '#f87171',
-                fontSize: '14px',
-                fontWeight: '700',
-                cursor: 'pointer',
-              }}
-            >
-              {deepgram.getFullTranscript().trim().length > 10 ? 'Score Current Answer' : 'Back to Setup'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Processing overlay (finished phase) */}
-      {phase === 'finished' && (
-        <div
-          style={{
-            position: 'relative',
-            zIndex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '14px',
-            padding: '30px',
-            animation: 'fadeIn 0.3s ease',
-          }}
-        >
-          <div
-            style={{
-              width: '36px',
-              height: '36px',
-              border: '3px solid rgba(99,102,241,0.2)',
-              borderTopColor: '#6366f1',
-              borderRadius: '50%',
-              animation: 'spin 0.75s linear infinite',
-            }}
-          />
-          <p style={{ color: '#94a3b8', fontSize: '14px', margin: 0, textAlign: 'center' }}>
-            {state.isScoring ? 'Analyzing your answer...' : 'Transcribing your response...'}
-          </p>
-        </div>
-      )}
-
-      {/* ── Bottom section: Transcript + controls ── */}
-      <section
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          flex: '0 0 240px',
-          minHeight: 0,
-          padding: '0.65rem 1.1rem 1.1rem',
-          border: '1px solid rgba(255, 255, 255, 0.14)',
-          borderRadius: '22px',
-          background: 'linear-gradient(165deg, rgba(10, 19, 31, 0.94), rgba(6, 13, 23, 0.98))',
-          color: '#ecfffb',
-          boxShadow: 'inset 0 0 22px rgba(255, 255, 255, 0.05), 0 10px 24px rgba(0, 0, 0, 0.35)',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '0.18rem 0.7rem 0.35rem',
-            marginBottom: '0.7rem',
-          }}
-        >
-          <strong
-            style={{
-              fontFamily: "'Unbounded', 'Space Grotesk', sans-serif",
-              fontSize: '0.85rem',
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: '#ececec',
-            }}
-          >
-            Live Transcript
-          </strong>
-
-          {/* Question display (compact) */}
-          {state.currentQuestion && phase === 'ready' && (
-            <span style={{ fontSize: '0.75rem', color: '#94a3b8', maxWidth: '60%', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {state.currentQuestion.text}
-            </span>
+              <div
+                style={{
+                  width: '7px',
+                  height: '7px',
+                  borderRadius: '50%',
+                  background: '#a78bfa',
+                  flexShrink: 0,
+                  animation: 'pulse-ring 1.2s ease-out infinite',
+                }}
+              />
+              <span
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#c4b5fd',
+                  letterSpacing: '0.01em',
+                }}
+              >
+                Moving to the next question&hellip;
+              </span>
+            </div>
           )}
-        </div>
 
-        <div
-          ref={transcriptBodyRef}
-          className="transcript-scroll"
-          style={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: 'scroll',
-            paddingRight: '0.2rem',
-          }}
-        >
-          <p style={{ marginTop: 0, lineHeight: 1.54, color: '#d7d7d7' }}>
-            {state.liveTranscript || deepgram.transcript || (
-              phase === 'ready'
-                ? 'Click "Start" to begin the interview. Your transcript will appear here as you speak.'
-                : phase === 'speaking-question' || phase === 'thinking'
-                  ? 'Preparing to listen...'
-                  : 'Waiting for you to speak...'
-            )}
-          </p>
-        </div>
+          {/* Thinking pause overlay */}
+          {phase === 'thinking' && (
+            <div
+              style={{
+                position: 'relative',
+                zIndex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                padding: '12px 24px',
+                marginBottom: '0.5rem',
+                background: 'rgba(129,140,248,0.07)',
+                border: '1px solid rgba(129,140,248,0.18)',
+                borderRadius: '14px',
+                animation: 'breathing 2s ease-in-out infinite',
+              }}
+            >
+              <div
+                style={{
+                  width: '7px',
+                  height: '7px',
+                  borderRadius: '50%',
+                  background: '#818cf8',
+                  flexShrink: 0,
+                  opacity: 0.8,
+                }}
+              />
+              <span
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#a5b4fc',
+                  letterSpacing: '0.01em',
+                }}
+              >
+                Take a moment to collect your thoughts&hellip;
+              </span>
+            </div>
+          )}
 
-        {/* Silence nudge */}
-        <SilenceNudge visible={phase === 'silence-detected'} message={silenceMessage} />
+          {/* Mic error panel */}
+          {phase === 'mic-error' && (
+            <div
+              style={{
+                position: 'relative',
+                zIndex: 1,
+                padding: '20px 24px',
+                marginBottom: '0.5rem',
+                background: 'rgba(248,113,113,0.07)',
+                border: '1px solid rgba(248,113,113,0.22)',
+                borderRadius: '14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                alignItems: 'center',
+                textAlign: 'center',
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#f87171' }}>
+                Microphone Disconnected
+              </h3>
+              <p style={{ margin: 0, fontSize: '14px', color: '#fca5a5' }}>
+                Your microphone was disconnected during recording.
+              </p>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '8px' }}>
+                <button
+                  onClick={handleStart}
+                  disabled={!state.currentQuestion}
+                  style={{
+                    padding: '10px 24px',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(99,102,241,0.4)',
+                    background: 'rgba(99,102,241,0.15)',
+                    color: '#a5b4fc',
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    cursor: state.currentQuestion ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  Retry with Mic
+                </button>
+                <button
+                  onClick={() => {
+                    const transcript = deepgram.getFullTranscript().trim();
+                    if (transcript.length > 10) {
+                      void handleDone();
+                    } else {
+                      navigate('/');
+                    }
+                  }}
+                  style={{
+                    padding: '10px 24px',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(248,113,113,0.3)',
+                    background: 'rgba(248,113,113,0.1)',
+                    color: '#f87171',
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {deepgram.getFullTranscript().trim().length > 10 ? 'Score Current Answer' : 'Back to Setup'}
+                </button>
+              </div>
+            </div>
+          )}
 
-        {/* Short answer warning */}
-        {shortAnswerWarning && (
-          <div
+          {/* ── Bottom section: Transcript + controls ── */}
+          <section
             style={{
-              marginTop: '0.5rem',
-              padding: '10px 14px',
-              background: 'rgba(245,158,11,0.07)',
-              border: '1px solid rgba(245,158,11,0.25)',
-              borderRadius: '10px',
-              fontSize: '13px',
-              color: '#fbbf24',
-              lineHeight: 1.5,
+              position: 'relative',
+              zIndex: 1,
+              flex: '0 0 240px',
+              minHeight: 0,
+              padding: '0.65rem 1.1rem 1.1rem',
+              border: '1px solid rgba(255, 255, 255, 0.14)',
+              borderRadius: '22px',
+              background: 'linear-gradient(165deg, rgba(10, 19, 31, 0.94), rgba(6, 13, 23, 0.98))',
+              color: '#ecfffb',
+              boxShadow: 'inset 0 0 22px rgba(255, 255, 255, 0.05), 0 10px 24px rgba(0, 0, 0, 0.35)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
             }}
           >
-            {shortAnswerWarning}
-          </div>
-        )}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0.18rem 0.7rem 0.35rem',
+                marginBottom: '0.7rem',
+              }}
+            >
+              <strong
+                style={{
+                  fontFamily: "'Unbounded', 'Space Grotesk', sans-serif",
+                  fontSize: '0.85rem',
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  color: '#ececec',
+                }}
+              >
+                Live Transcript
+              </strong>
 
-      </section>
+              {/* Question display (compact) */}
+              {state.currentQuestion && phase === 'ready' && (
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8', maxWidth: '60%', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {state.currentQuestion.text}
+                </span>
+              )}
+            </div>
+
+            <div
+              ref={transcriptBodyRef}
+              className="transcript-scroll"
+              style={{
+                flex: 1,
+                minHeight: 0,
+                overflowY: 'scroll',
+                paddingRight: '0.2rem',
+              }}
+            >
+              <p style={{ marginTop: 0, lineHeight: 1.54, color: '#d7d7d7' }}>
+                {state.liveTranscript || deepgram.transcript || (
+                  phase === 'ready'
+                    ? 'Click "Start" to begin the interview. Your transcript will appear here as you speak.'
+                    : phase === 'speaking-question' || phase === 'thinking'
+                      ? 'Preparing to listen...'
+                      : 'Waiting for you to speak...'
+                )}
+              </p>
+            </div>
+
+            {/* Silence nudge */}
+            <SilenceNudge visible={phase === 'silence-detected'} message={silenceMessage} />
+
+            {/* Short answer warning */}
+            {shortAnswerWarning && (
+              <div
+                style={{
+                  marginTop: '0.5rem',
+                  padding: '10px 14px',
+                  background: 'rgba(245,158,11,0.07)',
+                  border: '1px solid rgba(245,158,11,0.25)',
+                  borderRadius: '10px',
+                  fontSize: '13px',
+                  color: '#fbbf24',
+                  lineHeight: 1.5,
+                }}
+              >
+                {shortAnswerWarning}
+              </div>
+            )}
+
+          </section>
+        </>
+      )}
     </div>
   );
 }
