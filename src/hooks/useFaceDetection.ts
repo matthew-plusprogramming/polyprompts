@@ -146,8 +146,20 @@ export function useFaceDetection({ videoElement, enabled }: UseFaceDetectionOpti
     blinkCooldown.current = 0;
   }, []);
 
+  const noFaceFrames = useRef(0);
+
   const processResults = useCallback((results: { multiFaceLandmarks?: MediaPipeLandmark[][] }) => {
-    if (!results.multiFaceLandmarks?.length) return;
+    if (!results.multiFaceLandmarks?.length) {
+      noFaceFrames.current++;
+      if (noFaceFrames.current === 1 || noFaceFrames.current % 90 === 0) {
+        log.warn('No face detected', { consecutiveFrames: noFaceFrames.current });
+      }
+      return;
+    }
+    if (noFaceFrames.current > 0) {
+      log.info('Face re-detected', { missedFrames: noFaceFrames.current });
+      noFaceFrames.current = 0;
+    }
     const lm = results.multiFaceLandmarks[0];
     sessionFrames.current++;
 
@@ -203,16 +215,53 @@ export function useFaceDetection({ videoElement, enabled }: UseFaceDetectionOpti
     headStabilitySum.current += headStability;
     nervousnessSum.current += nervousnessSignal;
     confidenceSum.current += confidence;
+
+    // Periodic logging (~every 3s at 30fps)
+    if (sessionFrames.current === 1 || sessionFrames.current % 90 === 0) {
+      log.info('Metrics snapshot', {
+        frames: sessionFrames.current,
+        eyeContact: Math.round((eyeContactFrames.current / sessionFrames.current) * 100),
+        headStability: Math.round(headStabilitySum.current / sessionFrames.current),
+        confidence: Math.round(confidenceSum.current / sessionFrames.current),
+        rawGaze: +gazeSmooth.current.toFixed(3),
+      });
+    }
   }, []);
+
+  const sendFrameCount = useRef(0);
+  const sendErrorCount = useRef(0);
+  const skipCount = useRef(0);
 
   const runLoop = useCallback(() => {
     if (!activeRef.current) return;
     const video = videoElement.current;
     const mesh = faceMeshRef.current;
     if (video && mesh && video.readyState >= 2) {
-      mesh.send({ image: video }).catch(() => {
-        // Silently skip frames where send fails
+      sendFrameCount.current++;
+      mesh.send({ image: video }).catch((err) => {
+        sendErrorCount.current++;
+        if (sendErrorCount.current === 1 || sendErrorCount.current % 30 === 0) {
+          log.warn('FaceMesh send failed', { errorCount: sendErrorCount.current, error: String(err) });
+        }
       });
+      if (sendFrameCount.current === 1 || sendFrameCount.current % 150 === 0) {
+        log.info('rAF loop status', {
+          framesSent: sendFrameCount.current,
+          sendErrors: sendErrorCount.current,
+          skipped: skipCount.current,
+          processedFrames: sessionFrames.current,
+        });
+      }
+    } else {
+      skipCount.current++;
+      if (skipCount.current === 1 || skipCount.current % 60 === 0) {
+        log.warn('rAF skipping frame', {
+          hasVideo: !!video,
+          hasMesh: !!mesh,
+          videoReady: video?.readyState,
+          skipped: skipCount.current,
+        });
+      }
     }
     rafIdRef.current = requestAnimationFrame(runLoop);
   }, [videoElement]);
@@ -248,9 +297,17 @@ export function useFaceDetection({ videoElement, enabled }: UseFaceDetectionOpti
       activeRef.current = true;
       setIsActive(true);
       setStatus('active');
-      log.info('Face Mesh active, starting rAF loop');
 
       resetAccumulators();
+      sendFrameCount.current = 0;
+      sendErrorCount.current = 0;
+      skipCount.current = 0;
+      noFaceFrames.current = 0;
+      log.info('Face Mesh active, starting rAF loop', {
+        videoReady: videoElement.current?.readyState,
+        videoWidth: videoElement.current?.videoWidth,
+        videoHeight: videoElement.current?.videoHeight,
+      });
       runLoop();
     } catch (err) {
       log.warn('Face detection failed to start — interview continues without it', { error: String(err) });
@@ -259,17 +316,21 @@ export function useFaceDetection({ videoElement, enabled }: UseFaceDetectionOpti
   }, [enabled, processResults, resetAccumulators, runLoop]);
 
   const stop = useCallback(() => {
+    log.info('Face detection stopping', {
+      wasActive: activeRef.current,
+      sessionFrames: sessionFrames.current,
+      framesSent: sendFrameCount.current,
+      sendErrors: sendErrorCount.current,
+      skippedFrames: skipCount.current,
+    });
     activeRef.current = false;
     setIsActive(false);
     if (rafIdRef.current != null) {
       cancelAnimationFrame(rafIdRef.current);
       rafIdRef.current = null;
     }
-    if (status === 'active') {
-      setStatus('idle');
-    }
-    log.info('Face detection stopped');
-  }, [status]);
+    setStatus('idle');
+  }, []);
 
   const reset = useCallback(() => {
     resetAccumulators();
@@ -279,14 +340,21 @@ export function useFaceDetection({ videoElement, enabled }: UseFaceDetectionOpti
   const getSessionAverages = useCallback((): FaceMetrics => {
     const frames = sessionFrames.current;
     if (frames === 0) {
+      log.warn('getSessionAverages called with 0 frames', {
+        framesSent: sendFrameCount.current,
+        sendErrors: sendErrorCount.current,
+        skippedFrames: skipCount.current,
+      });
       return { eyeContactPercent: 0, headStability: 0, nervousnessScore: 0, confidenceScore: 0 };
     }
-    return {
+    const result = {
       eyeContactPercent: Math.round((eyeContactFrames.current / frames) * 100),
       headStability: Math.round(headStabilitySum.current / frames),
       nervousnessScore: Math.round(nervousnessSum.current / frames),
       confidenceScore: Math.round(confidenceSum.current / frames),
     };
+    log.info('getSessionAverages', { frames, ...result });
+    return result;
   }, []);
 
   return { start, stop, reset, isActive, status, getSessionAverages };
