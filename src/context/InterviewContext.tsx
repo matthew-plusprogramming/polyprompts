@@ -1,33 +1,9 @@
-import { createContext, useContext, useEffect, useReducer } from 'react';
-import type { InterviewState, InterviewAction, ScoringResult } from '../types';
+import { createContext, useContext, useReducer, useMemo, useEffect } from 'react';
 import type { ReactNode, Dispatch } from 'react';
+import type { InterviewState, InterviewAction, Session } from '../types';
 
-const demoResult: ScoringResult = {
-  scores: {
-    situation: { level: null, explanation: null, percent: 0 },
-    task: { level: null, explanation: null, percent: 0 },
-    action: { level: null, explanation: null, percent: 0 },
-    result: {
-      level: 'Getting Started',
-      explanation: 'Your outcome is mentioned, but it is not yet specific or measurable.',
-      percent: 0,
-    },
-    communication: {
-      level: 'Solid',
-      explanation: 'Your ideas are clear and structured; consider tightening phrasing for more impact.',
-      percent: 0,
-    },
-    pacing: { level: null, explanation: null, percent: 50 },
-  },
-  suggestions: [
-    'Add one measurable outcome (number, %, or time saved).',
-    'State the result in a single sentence before expanding.',
-    'Mirror the question keywords to improve alignment.',
-  ],
-  followUp: 'What specific metric best proves the outcome you described?',
-};
-
-const USE_DEMO_RESULT = true;
+const STORAGE_KEY_SESSIONS = 'polyprompts-sessions';
+const STORAGE_KEY_PREFS = 'polyprompts-prefs';
 
 const initialState: InterviewState = {
   role: 'swe_intern',
@@ -37,11 +13,16 @@ const initialState: InterviewState = {
   liveTranscript: '',
   audioBlob: null,
   isScoring: false,
-  currentResult: demoResult,
+  currentResult: null,
   previousAttempts: [],
   fillerCount: 0,
   wordsPerMinute: 0,
   speakingDurationSeconds: 0,
+  totalDurationSeconds: 0,
+  resumeData: null,
+  sessionHistory: [],
+  ttsVoice: 'alloy',
+  ttsSpeed: 1.0,
 };
 
 function interviewReducer(state: InterviewState, action: InterviewAction): InterviewState {
@@ -52,6 +33,8 @@ function interviewReducer(state: InterviewState, action: InterviewAction): Inter
       return { ...state, difficulty: action.payload };
     case 'SET_QUESTION':
       return { ...state, currentQuestion: action.payload };
+    case 'SET_RESUME_DATA':
+      return { ...state, resumeData: action.payload };
     case 'START_RECORDING':
       return { ...state, isRecording: true, liveTranscript: '', audioBlob: null };
     case 'STOP_RECORDING':
@@ -64,6 +47,8 @@ function interviewReducer(state: InterviewState, action: InterviewAction): Inter
       return { ...state, isScoring: true };
     case 'SET_RESULT':
       return { ...state, isScoring: false, currentResult: action.payload };
+    case 'SET_TOTAL_DURATION':
+      return { ...state, totalDurationSeconds: action.payload };
     case 'RETRY':
       return {
         ...state,
@@ -78,9 +63,16 @@ function interviewReducer(state: InterviewState, action: InterviewAction): Inter
         fillerCount: 0,
         wordsPerMinute: 0,
         speakingDurationSeconds: 0,
+        totalDurationSeconds: 0,
       };
+    case 'SET_TTS_VOICE':
+      return { ...state, ttsVoice: action.payload };
+    case 'SET_TTS_SPEED':
+      return { ...state, ttsSpeed: action.payload };
     case 'NEXT_QUESTION':
-      return { ...initialState, role: state.role, difficulty: state.difficulty };
+      return { ...initialState, role: state.role, difficulty: state.difficulty, resumeData: state.resumeData, sessionHistory: state.sessionHistory, ttsVoice: state.ttsVoice, ttsSpeed: state.ttsSpeed };
+    case 'SAVE_SESSION':
+      return { ...state, sessionHistory: [...state.sessionHistory, action.payload] };
     default:
       return state;
   }
@@ -94,13 +86,40 @@ interface InterviewContextValue {
 const InterviewContext = createContext<InterviewContextValue | null>(null);
 
 export function InterviewProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(interviewReducer, initialState);
+  const savedSessions = useMemo<Session[]>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_SESSIONS);
+      return stored ? (JSON.parse(stored) as Session[]) : [];
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const savedPrefs = useMemo(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_PREFS);
+      return stored ? (JSON.parse(stored) as { role?: InterviewState['role']; difficulty?: InterviewState['difficulty']; ttsVoice?: string; ttsSpeed?: number }) : {};
+    } catch {
+      return {};
+    }
+  }, []);
+
+  const [state, dispatch] = useReducer(interviewReducer, {
+    ...initialState,
+    sessionHistory: savedSessions,
+    ...(savedPrefs.role ? { role: savedPrefs.role } : {}),
+    ...(savedPrefs.difficulty ? { difficulty: savedPrefs.difficulty } : {}),
+    ...(savedPrefs.ttsVoice ? { ttsVoice: savedPrefs.ttsVoice } : {}),
+    ...(savedPrefs.ttsSpeed != null ? { ttsSpeed: savedPrefs.ttsSpeed } : {}),
+  });
 
   useEffect(() => {
-    if (!USE_DEMO_RESULT) return;
-    if (state.currentResult) return;
-    dispatch({ type: 'SET_RESULT', payload: demoResult });
-  }, [state.currentResult]);
+    localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(state.sessionHistory));
+  }, [state.sessionHistory]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_PREFS, JSON.stringify({ role: state.role, difficulty: state.difficulty, ttsVoice: state.ttsVoice, ttsSpeed: state.ttsSpeed }));
+  }, [state.role, state.difficulty, state.ttsVoice, state.ttsSpeed]);
 
   return (
     <InterviewContext.Provider value={{ state, dispatch }}>

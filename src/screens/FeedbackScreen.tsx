@@ -34,24 +34,14 @@ function getLevelPercent(level?: ScoreLevel) {
   return Math.round((getLevelValue(level) / maxLevelValue) * 100);
 }
 
-function clamp01(value: number) {
-  return Math.max(0, Math.min(1, value));
+function getScoreRatio(score?: { level: ScoreLevel; explanation: string }) {
+  if (!score) return 0;
+  return getLevelValue(score.level) / maxLevelValue;
 }
 
-function getScoreRatio(score?: { level?: ScoreLevel | null; percent?: number | null }) {
+function getScorePercent(score?: { level: ScoreLevel; explanation: string }) {
   if (!score) return 0;
-  if (typeof score.percent === "number") {
-    return clamp01(score.percent / 100);
-  }
-  return getLevelValue(score.level ?? undefined) / maxLevelValue;
-}
-
-function getScorePercent(score?: { level?: ScoreLevel | null; percent?: number | null }) {
-  if (!score) return 0;
-  if (typeof score.percent === "number") {
-    return Math.round(clamp01(score.percent / 100) * 100);
-  }
-  return getLevelPercent(score.level ?? undefined);
+  return getLevelPercent(score.level);
 }
 
 function getOverallPercent(result: ScoringResult | null) {
@@ -112,7 +102,7 @@ export default function FeedbackScreen() {
     if (!result) return [];
     return dimensions
       .map((dimension) => {
-        const score = result.scores[dimension.key] ?? { level: null, explanation: null, percent: null };
+        const score = result.scores[dimension.key];
         return {
           key: dimension.key,
           label: dimension.label,
@@ -141,7 +131,7 @@ export default function FeedbackScreen() {
     );
     const hasAnyScore = rawRatios.some((value) => value > 0);
     return dimensions
-      .map((dimension, index) => {
+      .map((_dimension, index) => {
         const angle = (-90 + index * 60) * (Math.PI / 180);
         const baseValue = rawRatios[index];
         const value = hasAnyScore && baseValue === 0 ? 0.02 : baseValue;
@@ -316,8 +306,8 @@ export default function FeedbackScreen() {
             <div className="scoreboard__list">
               {dimensions.map((dimension) => {
                 const score = result?.scores[dimension.key as DimensionKey];
-                const level = score?.level ?? null;
-                const explanation = score?.explanation ?? null;
+                const level = score?.level;
+                const explanation = score?.explanation;
                 const percent = getScorePercent(score);
                 return (
                   <div key={dimension.key} className="scoreboard__row">
