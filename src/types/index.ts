@@ -39,6 +39,18 @@ export interface ScoringResult {
   positiveCallouts: [string, string];
 }
 
+export interface QuestionResult {
+  question: Question;
+  transcript: string;
+  audioBlob?: Blob;
+  scoringResult: ScoringResult | null;  // null while scoring in background
+  metrics: {
+    fillerCount: number;
+    wordsPerMinute: number;
+    speakingDurationSeconds: number;
+  };
+}
+
 export interface Session {
   id: string;
   questionId: string;
@@ -52,7 +64,10 @@ export interface Session {
 export interface InterviewState {
   role: Role;
   difficulty: Difficulty;
-  currentQuestion: Question | null;
+  questions: Question[];
+  currentQuestionIndex: number;
+  currentQuestion: Question | null;  // derived: questions[currentQuestionIndex]
+  questionResults: QuestionResult[];
   isRecording: boolean;
   liveTranscript: string;
   audioBlob: Blob | null;
@@ -73,6 +88,10 @@ export type InterviewAction =
   | { type: 'SET_ROLE'; payload: Role }
   | { type: 'SET_DIFFICULTY'; payload: Difficulty }
   | { type: 'SET_QUESTION'; payload: Question }
+  | { type: 'SET_QUESTIONS'; payload: Question[] }
+  | { type: 'SAVE_QUESTION_RESULT'; payload: QuestionResult }
+  | { type: 'UPDATE_QUESTION_SCORING'; payload: { index: number; scoringResult: ScoringResult } }
+  | { type: 'ADVANCE_QUESTION' }
   | { type: 'SET_RESUME_DATA'; payload: ResumeData }
   | { type: 'START_RECORDING' }
   | { type: 'STOP_RECORDING'; payload: Blob }

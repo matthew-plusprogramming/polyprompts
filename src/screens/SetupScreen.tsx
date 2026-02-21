@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, type DragEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInterview } from '../context/InterviewContext';
-import { seededQuestions } from '../data/questions';
+import { loadQuestions } from '../services/questionLoader';
 import type { Difficulty, Role } from '../types';
 import { createLogger } from '../utils/logger';
 
@@ -1120,7 +1120,7 @@ export default function SetupScreen() {
     return 'swe_intern';
   };
 
-  const handleStart = () => {
+  const handleStart = async () => {
     if (!canStart || launching || !role) return;
     setLaunching(true);
     log.info('Interview starting', { role, difficulty, category, mode, hasResume: !!resumeData });
@@ -1129,26 +1129,28 @@ export default function SetupScreen() {
     dispatch({ type: 'SET_ROLE', payload: mappedRole });
     dispatch({ type: 'SET_DIFFICULTY', payload: difficulty });
 
-    const matching = seededQuestions.filter((q) => q.role === mappedRole && q.difficulty === difficulty);
-    const categoryFiltered =
-      category === 'random'
-        ? matching
-        : matching.filter((q) => {
-            const qcat = (q.category ?? '').toLowerCase();
-            if (category === 'teamwork') return qcat.includes('team');
-            if (category === 'leadership') return qcat.includes('leader') || qcat.includes('priorit');
-            if (category === 'conflict') return qcat.includes('conflict') || qcat.includes('disagree');
-            if (category === 'failure') return qcat.includes('mistake') || qcat.includes('fail');
-            return true;
-          });
+    try {
+      const questions = await loadQuestions({
+        role: mappedRole,
+        difficulty,
+        category: category === 'random' ? undefined : category,
+        resumeData: mode === 'resume' && resumeData
+          ? { skills: resumeData.skills, experience: resumeData.experiences, projects: [], education: resumeData.education }
+          : null,
+        count: 2,
+      });
 
-    const pool = categoryFiltered.length > 0 ? categoryFiltered : matching;
-    const question = pool[Math.floor(Math.random() * pool.length)] ?? seededQuestions[0];
-
-    if (question) {
-      dispatch({ type: 'SET_QUESTION', payload: question });
+      log.info('Questions loaded', { count: questions.length, ids: questions.map(q => q.id) });
+      if (questions.length > 0) {
+        dispatch({ type: 'SET_QUESTIONS', payload: questions });
+      } else {
+        log.warn('No questions matched filters', { role: mappedRole, difficulty, category });
+      }
+      navigate('/interview');
+    } catch (err) {
+      console.error('[SetupScreen] Failed to load questions:', err);
+      setLaunching(false);
     }
-    navigate('/interview');
   };
 
   const stagger = (i: number) => ({
