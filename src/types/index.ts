@@ -1,3 +1,5 @@
+export type { FaceMetrics } from './faceDetection';
+
 export type Role = 'swe_intern' | 'pm_intern';
 export type Difficulty = 'easy' | 'medium' | 'hard';
 export type ScoreLevel = 'Getting Started' | 'Developing' | 'Solid' | 'Strong';
@@ -48,6 +50,7 @@ export interface QuestionResult {
     fillerCount: number;
     wordsPerMinute: number;
     speakingDurationSeconds: number;
+    faceMetrics?: import('./faceDetection').FaceMetrics;
   };
 }
 

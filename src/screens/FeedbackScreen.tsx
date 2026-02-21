@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInterview } from "../context/InterviewContext";
-import type { ScoreLevel, ScoringResult } from "../types";
+import type { ScoreLevel, ScoringResult, FaceMetrics } from "../types";
 import "./FeedbackScreen.css";
 import { createLogger } from "../utils/logger";
 
@@ -78,6 +78,31 @@ export default function FeedbackScreen() {
   const result = lastScoredResult;
   const overallPercent = getOverallPercent(result);
   const hasResult = Boolean(result);
+
+  // Average face metrics across all questions that have them
+  const avgFaceMetrics = useMemo((): FaceMetrics | null => {
+    const withFace = questionResults.filter((qr) => qr.metrics.faceMetrics);
+    if (withFace.length === 0) return null;
+    const sum = withFace.reduce(
+      (acc, qr) => {
+        const fm = qr.metrics.faceMetrics!;
+        return {
+          eyeContactPercent: acc.eyeContactPercent + fm.eyeContactPercent,
+          headStability: acc.headStability + fm.headStability,
+          nervousnessScore: acc.nervousnessScore + fm.nervousnessScore,
+          confidenceScore: acc.confidenceScore + fm.confidenceScore,
+        };
+      },
+      { eyeContactPercent: 0, headStability: 0, nervousnessScore: 0, confidenceScore: 0 },
+    );
+    const n = withFace.length;
+    return {
+      eyeContactPercent: Math.round(sum.eyeContactPercent / n),
+      headStability: Math.round(sum.headStability / n),
+      nervousnessScore: Math.round(sum.nervousnessScore / n),
+      confidenceScore: Math.round(sum.confidenceScore / n),
+    };
+  }, [questionResults]);
 
   useEffect(() => {
     log.info("Mounted", {
@@ -519,6 +544,40 @@ export default function FeedbackScreen() {
                 <p>Suggestions will appear after scoring.</p>
               )}
             </div>
+
+          {avgFaceMetrics && (
+            <div className="feedback__card feedback__card--body-language">
+              <h2>Body Language</h2>
+              <div className="body-language__bars">
+                {([
+                  { label: 'Eye Contact', value: avgFaceMetrics.eyeContactPercent },
+                  { label: 'Head Stability', value: avgFaceMetrics.headStability },
+                  { label: 'Composure', value: 100 - avgFaceMetrics.nervousnessScore },
+                  { label: 'Confidence', value: avgFaceMetrics.confidenceScore },
+                ] as const).map(({ label, value }) => {
+                  const color = value > 70 ? '#4ade80' : value >= 40 ? '#fbbf24' : '#f87171';
+                  return (
+                    <div key={label} className="body-language__row">
+                      <div className="body-language__row-header">
+                        <span>{label}</span>
+                        <strong style={{ color }}>{value}%</strong>
+                      </div>
+                      <div className="scoreboard__bar">
+                        <div
+                          className="scoreboard__bar-fill"
+                          style={{
+                            width: `${value}%`,
+                            background: `linear-gradient(90deg, ${color}, ${color}66)`,
+                            boxShadow: `0 0 10px ${color}55`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="feedback__actions">
             <button className="feedback__button" onClick={handleRetry}>
