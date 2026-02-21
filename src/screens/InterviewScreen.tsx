@@ -6,6 +6,7 @@ import microphoneOnIcon from '../icons/microphoneOn.png';
 import microphoneOffIcon from '../icons/microphoneOff.png';
 import cameraOnIcon from '../icons/cameraOn.png';
 import cameraOffIcon from '../icons/cameraOff.png';
+import starlyIcon from '../icons/StarlyLogo.png';
 
 export default function InterviewScreen() {
   const { state } = useInterview();
@@ -17,9 +18,6 @@ export default function InterviewScreen() {
   const [cameraError, setCameraError] = useState('');
   const [cameraEnabled, setCameraEnabled] = useState(true);
   const [micEnabled, setMicEnabled] = useState(true);
-  const [currentTime, setCurrentTime] = useState(() =>
-    new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-  );
   const [answerSeconds, setAnswerSeconds] = useState(0);
 
   const handleDone = () => {
@@ -89,13 +87,6 @@ export default function InterviewScreen() {
   }, [cameraEnabled]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setCurrentTime(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
     if (!micEnabled) return;
     const id = window.setInterval(() => {
       setAnswerSeconds((seconds) => seconds + 1);
@@ -108,6 +99,7 @@ export default function InterviewScreen() {
     const secs = answerSeconds % 60;
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   }, [answerSeconds]);
+
   const demoTranscript = `
 Interviewer: Tell me about a time you solved a complex problem under pressure.
 Candidate: In my previous role, our release pipeline failed on launch day and blocked customer updates. I took ownership of triage, split the incident into build, test, and deploy tracks, and coordinated with engineering and QA in 15-minute checkpoints.
@@ -132,73 +124,86 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
     <div
       style={{
         height: '100vh',
-        padding: '1rem 1.4rem 1rem',
+        padding: '0.7rem 0.45rem',
         boxSizing: 'border-box',
-        width: '100%',
-        maxWidth: '1480px',
-        margin: '0 auto',
+        width: '100vw',
+        maxWidth: 'none',
+        margin: 0,
         position: 'relative',
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
-        borderRadius: '24px',
-        border: '1px solid rgba(125, 158, 255, 0.22)',
-        color: '#e6efff',
-        backgroundColor: '#030b1d',
+        borderRadius: '26px',
+        border: '1px solid rgba(255, 255, 255, 0.14)',
+        color: '#eef8ff',
+        backgroundColor: '#050a14',
         background:
-          'radial-gradient(circle at 8% -10%, rgba(56, 189, 248, 0.25), transparent 35%), radial-gradient(circle at 90% 0%, rgba(59, 130, 246, 0.22), transparent 34%), linear-gradient(135deg, rgba(30, 64, 175, 0.18), rgba(3, 7, 18, 0.15) 45%, rgba(14, 165, 233, 0.1) 100%), repeating-linear-gradient(120deg, rgba(148, 163, 184, 0.05) 0px, rgba(148, 163, 184, 0.05) 1px, transparent 1px, transparent 14px), #020a1a',
-        boxShadow: '0 20px 80px rgba(2, 6, 23, 0.6), inset 0 0 48px rgba(59, 130, 246, 0.12)',
+          'radial-gradient(circle at 12% -5%, rgba(255, 255, 255, 0.14), transparent 34%), radial-gradient(circle at 88% 8%, rgba(220, 220, 220, 0.12), transparent 32%), linear-gradient(145deg, rgba(8, 12, 18, 0.98), rgba(10, 10, 10, 0.96) 48%, rgba(14, 16, 20, 0.98)), repeating-linear-gradient(135deg, rgba(148, 163, 184, 0.04) 0px, rgba(148, 163, 184, 0.04) 1px, transparent 1px, transparent 15px)',
+        boxShadow: '0 20px 80px rgba(2, 8, 22, 0.7), inset 0 0 45px rgba(255, 255, 255, 0.05)',
         fontFamily: "'Space Grotesk', 'Segoe UI', sans-serif",
       }}
     >
       <style>
         {`
+          @import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&display=swap');
           .transcript-scroll {
             scrollbar-width: thin;
-            scrollbar-color: rgba(125, 211, 252, 0.6) rgba(8, 23, 50, 0.35);
+            scrollbar-color: rgba(230, 230, 230, 0.9) rgba(20, 28, 40, 0.55);
           }
           .transcript-scroll::-webkit-scrollbar {
-            width: 10px;
+            width: 11px;
           }
           .transcript-scroll::-webkit-scrollbar-track {
-            background: rgba(8, 23, 50, 0.32);
+            background: rgba(17, 24, 39, 0.75);
             border-radius: 999px;
           }
           .transcript-scroll::-webkit-scrollbar-thumb {
-            background: linear-gradient(180deg, rgba(186, 230, 253, 0.9), rgba(56, 189, 248, 0.75));
+            background: linear-gradient(180deg, rgba(250, 250, 250, 0.95), rgba(214, 214, 214, 0.86) 55%, rgba(165, 165, 165, 0.82));
             border-radius: 999px;
-            border: 2px solid rgba(8, 23, 50, 0.35);
+            border: 2px solid rgba(10, 15, 26, 0.8);
           }
           .transcript-scroll::-webkit-scrollbar-thumb:hover {
-            background: linear-gradient(180deg, rgba(224, 242, 254, 0.95), rgba(103, 232, 249, 0.85));
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(228, 228, 228, 0.9) 50%, rgba(182, 182, 182, 0.9));
+          }
+          @keyframes floatBlobA {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-14px) rotate(8deg); }
+          }
+          @keyframes floatBlobB {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(12px) rotate(-10deg); }
           }
         `}
       </style>
+
       <div
         style={{
           position: 'absolute',
           top: '-80px',
-          right: '-120px',
-          width: '320px',
-          height: '320px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(125, 211, 252, 0.25), rgba(125, 211, 252, 0))',
+          right: '-90px',
+          width: '280px',
+          height: '280px',
+          borderRadius: '34% 66% 61% 39% / 37% 43% 57% 63%',
+          background: 'radial-gradient(circle, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0))',
           pointerEvents: 'none',
-          filter: 'blur(2px)',
+          filter: 'blur(1px)',
+          animation: 'floatBlobA 7s ease-in-out infinite',
         }}
       />
       <div
         style={{
           position: 'absolute',
-          bottom: '-120px',
+          bottom: '-100px',
           left: '-80px',
-          width: '280px',
-          height: '280px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(59, 130, 246, 0.22), rgba(59, 130, 246, 0))',
+          width: '300px',
+          height: '300px',
+          borderRadius: '56% 44% 30% 70% / 41% 52% 48% 59%',
+          background: 'radial-gradient(circle, rgba(210, 210, 210, 0.2), rgba(210, 210, 210, 0))',
           pointerEvents: 'none',
+          animation: 'floatBlobB 8s ease-in-out infinite',
         }}
       />
+
       <header
         style={{
           position: 'relative',
@@ -211,34 +216,34 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
         }}
       >
         <div style={{ justifySelf: 'start' }}>
-          <div
+          <img
+            src={starlyIcon}
+            alt="Starly"
             style={{
-              color: '#bfdbfe',
-              fontSize: '0.95rem',
-              fontWeight: 800,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              marginLeft: '0.4rem',
+              height: '60px',
+              width: 'auto',
+              objectFit: 'contain',
+              marginLeft: '0.25rem',
             }}
-          >
-            STARLY
-          </div>
+          />
         </div>
 
         <div
           style={{
             justifySelf: 'center',
-            fontSize: '1.05rem',
+            fontSize: '1.08rem',
             fontWeight: 700,
-            color: '#dbeafe',
-            background: 'linear-gradient(160deg, rgba(11, 27, 56, 0.94), rgba(14, 36, 76, 0.76))',
-            border: '1px solid rgba(125, 158, 255, 0.35)',
-            borderRadius: '12px',
-            padding: '0.45rem 0.85rem',
-            boxShadow: '0 0 24px rgba(59, 130, 246, 0.2), inset 0 0 12px rgba(125, 211, 252, 0.16)',
+            color: '#041018',
+            fontFamily: "'Unbounded', 'Space Grotesk', sans-serif",
+            background: 'linear-gradient(135deg, #f3f3f3 5%, #dcdcdc 52%, #b8b8b8 100%)',
+            border: '1px solid rgba(255, 255, 255, 0.45)',
+            borderRadius: '14px',
+            padding: '0.52rem 1rem',
+            boxShadow: '0 0 24px rgba(255, 255, 255, 0.25), inset 0 -6px 14px rgba(0, 0, 0, 0.18)',
+            letterSpacing: '0.08em',
           }}
         >
-          {currentTime}
+          {answerTimeLabel}
         </div>
 
         <div style={{ justifySelf: 'end', display: 'flex', gap: '0.6rem' }}>
@@ -247,10 +252,11 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
             style={{
               padding: '0.55rem 0.95rem',
               borderRadius: '12px',
-              border: '1px solid rgba(125, 158, 255, 0.35)',
-              background: 'linear-gradient(145deg, rgba(11, 27, 56, 0.95), rgba(8, 23, 50, 0.85))',
-              color: '#dbeafe',
+              border: '1px solid rgba(255, 255, 255, 0.28)',
+              background: 'linear-gradient(145deg, rgba(8, 18, 34, 0.92), rgba(9, 20, 37, 0.8))',
+              color: '#f1f1f1',
               fontSize: '0.9rem',
+              letterSpacing: '0.06em',
             }}
           >
             Settings
@@ -261,12 +267,13 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
             style={{
               padding: '0.55rem 0.95rem',
               borderRadius: '12px',
-              border: '1px solid rgba(125, 211, 252, 0.85)',
-              background: 'linear-gradient(135deg, #0ea5e9, #2563eb 48%, #1e3a8a)',
-              color: '#eff6ff',
+              border: '1px solid rgba(255, 255, 255, 0.45)',
+              background: 'linear-gradient(130deg, #ffffff, #dcdcdc 45%, #bdbdbd)',
+              color: '#111111',
               fontSize: '0.9rem',
               fontWeight: 700,
-              boxShadow: '0 8px 20px rgba(14, 165, 233, 0.35)',
+              letterSpacing: '0.08em',
+              boxShadow: '0 0 18px rgba(255, 255, 255, 0.22)',
             }}
           >
             End
@@ -294,13 +301,13 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
             minHeight: 0,
             height: '100%',
             boxSizing: 'border-box',
-            border: '1px solid rgba(125, 158, 255, 0.28)',
-            borderRadius: '20px',
+            border: '1px solid rgba(255, 255, 255, 0.14)',
+            borderRadius: '22px 10px 22px 10px',
             overflow: 'hidden',
-            background: 'rgba(3, 15, 34, 0.94)',
-            color: '#eff6ff',
+            background: 'linear-gradient(165deg, rgba(10, 20, 37, 0.88), rgba(6, 12, 23, 0.95))',
+            color: '#f7f7f7',
             position: 'relative',
-            boxShadow: 'inset 0 0 28px rgba(37, 99, 235, 0.18), 0 10px 24px rgba(2, 6, 23, 0.35)',
+            boxShadow: 'inset 0 0 26px rgba(255, 255, 255, 0.05), 0 10px 24px rgba(0, 0, 0, 0.35)',
           }}
         >
           <video
@@ -350,9 +357,9 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
                       marginTop: '0.65rem',
                       padding: '0.4rem 0.7rem',
                       borderRadius: '8px',
-                      border: '1px solid rgba(125, 158, 255, 0.35)',
-                      background: 'rgba(14, 36, 76, 0.88)',
-                      color: '#dbeafe',
+                      border: '1px solid rgba(255, 255, 255, 0.22)',
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      color: '#f2f2f2',
                       cursor: 'pointer',
                     }}
                   >
@@ -380,8 +387,8 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
                 width: '42px',
                 height: '42px',
                 borderRadius: '999px',
-                border: micEnabled ? '1px solid rgba(125, 158, 255, 0.35)' : '1px solid rgba(147, 197, 253, 0.4)',
-                background: micEnabled ? 'rgba(14, 36, 76, 0.9)' : 'rgba(25, 57, 112, 0.9)',
+                border: micEnabled ? '1px solid rgba(255, 255, 255, 0.28)' : '1px solid rgba(190, 190, 190, 0.35)',
+                background: micEnabled ? 'rgba(18, 18, 18, 0.9)' : 'rgba(42, 42, 42, 0.9)',
                 color: '#fff',
                 cursor: 'pointer',
                 display: 'flex',
@@ -414,8 +421,8 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
                 width: '42px',
                 height: '42px',
                 borderRadius: '999px',
-                border: cameraEnabled ? '1px solid rgba(125, 158, 255, 0.35)' : '1px solid rgba(147, 197, 253, 0.4)',
-                background: cameraEnabled ? 'rgba(14, 36, 76, 0.9)' : 'rgba(25, 57, 112, 0.9)',
+                border: cameraEnabled ? '1px solid rgba(255, 255, 255, 0.28)' : '1px solid rgba(190, 190, 190, 0.35)',
+                background: cameraEnabled ? 'rgba(18, 18, 18, 0.9)' : 'rgba(42, 42, 42, 0.9)',
                 color: '#fff',
                 cursor: 'pointer',
                 display: 'flex',
@@ -443,35 +450,22 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
             minHeight: 0,
             height: '100%',
             boxSizing: 'border-box',
-            border: '1px solid rgba(125, 158, 255, 0.3)',
-            borderRadius: '20px',
-            background: 'linear-gradient(165deg, rgba(6, 22, 49, 0.95), rgba(4, 14, 31, 0.94))',
-            color: '#e0ebff',
+            border: '1px solid rgba(255, 255, 255, 0.14)',
+            borderRadius: '10px 22px 10px 22px',
+            background: 'linear-gradient(160deg, rgba(12, 22, 34, 0.95), rgba(8, 16, 27, 0.98))',
+            color: '#f0f0f0',
             padding: '1.15rem',
             display: 'flex',
             flexDirection: 'column',
             gap: '0.95rem',
+            alignItems: 'center',
+            justifyContent: 'center',
             overflow: 'hidden',
-            boxShadow: 'inset 0 0 28px rgba(59, 130, 246, 0.17), 0 10px 24px rgba(2, 6, 23, 0.35)',
+            boxShadow: 'inset 0 0 26px rgba(255, 255, 255, 0.05), 0 10px 24px rgba(0, 0, 0, 0.35)',
           }}
         >
-          <strong>Live Audio Waveform</strong>
-          <p style={{ marginTop: '0.4rem', marginBottom: '0.85rem', fontSize: '0.85rem', color: '#9dc6ff' }}>
-            Real-time visual pulse when STARLY asks questions.
-          </p>
-
-          <WaveformVisualizer height={210} micEnabled={micEnabled} />
-
-          <div style={{ marginTop: 'auto' }}>
-            <p style={{ margin: 0, fontSize: '0.78rem', color: '#9dc6ff', letterSpacing: '0.05em' }}>
-              QUICK METRICS
-            </p>
-            <div style={{ marginTop: '0.55rem', display: 'grid', gridTemplateColumns: '1fr', gap: '0.5rem' }}>
-              <div style={{ border: '1px solid rgba(125, 158, 255, 0.3)', borderRadius: '10px', padding: '0.55rem', background: 'rgba(14,36,76,0.45)' }}>
-                <div style={{ fontSize: '0.66rem', color: '#9dc6ff' }}>Timer</div>
-                <div style={{ fontSize: '0.95rem', color: '#e2edff', fontWeight: 700 }}>{answerTimeLabel}</div>
-              </div>
-            </div>
+          <div style={{ width: 'calc(100% + 2.3rem)', marginLeft: '-1.15rem', marginRight: '-1.15rem' }}>
+            <WaveformVisualizer height={285} micEnabled={micEnabled} />
           </div>
         </section>
       </div>
@@ -483,11 +477,11 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
           flex: '0 0 240px',
           minHeight: 0,
           padding: '0.65rem 1.1rem 1.1rem',
-          border: '1px solid rgba(125, 158, 255, 0.32)',
-          borderRadius: '20px',
-          background: 'linear-gradient(160deg, rgba(7, 22, 47, 0.95), rgba(3, 12, 27, 0.9))',
-          color: '#eaf2ff',
-          boxShadow: 'inset 0 0 22px rgba(59, 130, 246, 0.15), 0 10px 24px rgba(2, 6, 23, 0.35)',
+          border: '1px solid rgba(255, 255, 255, 0.14)',
+          borderRadius: '22px',
+          background: 'linear-gradient(165deg, rgba(10, 19, 31, 0.94), rgba(6, 13, 23, 0.98))',
+          color: '#ecfffb',
+          boxShadow: 'inset 0 0 22px rgba(255, 255, 255, 0.05), 0 10px 24px rgba(0, 0, 0, 0.35)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -498,11 +492,22 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '0.2rem 0.7rem 0.35rem',
+            padding: '0.18rem 0.7rem 0.35rem',
             marginBottom: '0.7rem',
           }}
         >
-          <strong style={{ fontSize: '0.9rem', textAlign: 'center' }}>Live Transcript</strong>
+          <strong
+            style={{
+              fontFamily: "'Unbounded', 'Space Grotesk', sans-serif",
+              fontSize: '0.85rem',
+              textAlign: 'center',
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: '#ececec',
+            }}
+          >
+            Live Transcript
+          </strong>
         </div>
         <div
           ref={transcriptBodyRef}
@@ -511,15 +516,14 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
             flex: 1,
             minHeight: 0,
             overflowY: 'scroll',
-            paddingRight: '0.25rem',
+            paddingRight: '0.2rem',
           }}
         >
-          <p style={{ marginTop: 0, lineHeight: 1.5, color: '#cfe3ff' }}>
+          <p style={{ marginTop: 0, lineHeight: 1.54, color: '#d7d7d7' }}>
             {state.liveTranscript || demoTranscript}
           </p>
         </div>
       </section>
-
     </div>
   );
 }

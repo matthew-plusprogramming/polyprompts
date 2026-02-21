@@ -92,12 +92,7 @@ export default function WaveformVisualizer({
     };
 
     const drawBackdrop = () => {
-      const base = context.createLinearGradient(0, 0, cssWidth, cssHeight);
-      base.addColorStop(0, '#05070f');
-      base.addColorStop(0.55, '#090f1f');
-      base.addColorStop(1, '#060916');
-      context.fillStyle = base;
-      context.fillRect(0, 0, cssWidth, cssHeight);
+      context.clearRect(0, 0, cssWidth, cssHeight);
     };
 
     const drawIdle = (message: string) => {
@@ -106,8 +101,8 @@ export default function WaveformVisualizer({
       const centerY = cssHeight / 2;
       const idleRadius = Math.max(32, Math.min(cssWidth, cssHeight) * 0.2);
       const idleGlow = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, idleRadius * 2.2);
-      idleGlow.addColorStop(0, 'rgba(170, 235, 255, 0.55)');
-      idleGlow.addColorStop(0.5, 'rgba(96, 184, 255, 0.28)');
+      idleGlow.addColorStop(0, 'rgba(255, 255, 255, 0.5)');
+      idleGlow.addColorStop(0.5, 'rgba(200, 200, 200, 0.25)');
       idleGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
       context.fillStyle = idleGlow;
       context.beginPath();
@@ -116,7 +111,7 @@ export default function WaveformVisualizer({
 
       const drewLogo = drawLogo(centerX, centerY, idleRadius * 2.05, 0.9);
       if (!drewLogo) {
-        context.fillStyle = 'rgba(218, 247, 255, 0.88)';
+        context.fillStyle = 'rgba(232, 232, 232, 0.88)';
         context.beginPath();
         context.arc(centerX, centerY, idleRadius * 0.7, 0, Math.PI * 2);
         context.fill();
@@ -223,9 +218,9 @@ export default function WaveformVisualizer({
           const rotation = -Math.PI / 2 + Math.sin(now * 0.0012) * 0.08;
 
           const centerGlow = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, pulseRadius * 2.25);
-          centerGlow.addColorStop(0, `rgba(198, 245, 255, ${0.62 + energy * 0.2})`);
-          centerGlow.addColorStop(0.38, `rgba(109, 194, 255, ${0.45 + energy * 0.22})`);
-          centerGlow.addColorStop(0.72, `rgba(46, 128, 255, ${0.18 + energy * 0.2})`);
+          centerGlow.addColorStop(0, `rgba(255, 255, 255, ${0.62 + energy * 0.2})`);
+          centerGlow.addColorStop(0.38, `rgba(222, 222, 222, ${0.45 + energy * 0.22})`);
+          centerGlow.addColorStop(0.72, `rgba(170, 170, 170, ${0.18 + energy * 0.2})`);
           centerGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
           context.fillStyle = centerGlow;
           context.beginPath();
@@ -236,13 +231,13 @@ export default function WaveformVisualizer({
           const drewMainLogo = drawLogo(centerX, centerY, logoSize, 0.82 + energy * 0.16, rotation);
 
           if (!drewMainLogo) {
-            context.fillStyle = `rgba(225, 250, 255, ${0.72 + energy * 0.2})`;
+            context.fillStyle = `rgba(238, 238, 238, ${0.72 + energy * 0.2})`;
             context.beginPath();
             context.arc(centerX, centerY, pulseRadius * 0.55, 0, Math.PI * 2);
             context.fill();
           }
 
-          context.fillStyle = `rgba(236, 252, 255, ${0.72 + energy * 0.2})`;
+          context.fillStyle = `rgba(246, 246, 246, ${0.72 + energy * 0.2})`;
           context.beginPath();
           context.arc(centerX, centerY, pulseRadius * 0.1, 0, Math.PI * 2);
           context.fill();
@@ -277,8 +272,8 @@ export default function WaveformVisualizer({
             const y = centerY + Math.sin(node.angle) * node.radius;
             const alpha = node.life * (0.2 + energy * 0.35);
             const glow = context.createRadialGradient(x, y, 0, x, y, node.size * 2.6);
-            glow.addColorStop(0, `hsla(${node.hue}, 95%, 72%, ${alpha * 1.3})`);
-            glow.addColorStop(0.45, `hsla(${node.hue + 10}, 92%, 60%, ${alpha})`);
+            glow.addColorStop(0, `rgba(255, 255, 255, ${alpha * 1.2})`);
+            glow.addColorStop(0.45, `rgba(205, 205, 205, ${alpha})`);
             glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
             context.fillStyle = glow;
             context.beginPath();
@@ -330,11 +325,11 @@ export default function WaveformVisualizer({
         position: 'relative',
         height: `${height}px`,
         width: '100%',
-        borderRadius: '14px',
+        borderRadius: '0',
         overflow: 'hidden',
-        border: '1px solid rgba(92, 146, 255, 0.32)',
-        background: 'linear-gradient(160deg, rgba(9, 14, 31, 0.95), rgba(6, 10, 22, 0.96))',
-        boxShadow: 'inset 0 0 24px rgba(45, 109, 255, 0.15), 0 6px 24px rgba(4, 8, 20, 0.55)',
+        border: 'none',
+        background: 'transparent',
+        boxShadow: 'none',
       }}
       aria-live="polite"
     >
