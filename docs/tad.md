@@ -11,7 +11,8 @@
 
 ### Backend / Infrastructure
 
-- **Supabase** — Gives us Postgres, auth, and real-time subscriptions out of the box with zero server setup. We skip building a custom backend entirely and go straight to storing sessions, scores, and transcripts. The real-time subscriptions could also power live metric updates if we need a server-push model.
+- **Express (Node.js + TypeScript)** — Lightweight proxy server that sits between the frontend and OpenAI. Its only job is to keep API keys off the client and forward requests. Express is the fastest thing to stand up for a hackathon — the team already knows it, and the framework overhead is negligible compared to the 2-8 second OpenAI round trips behind it.
+- **Supabase** — Gives us Postgres, auth, and real-time subscriptions out of the box. We still call Supabase directly from the frontend (the anon key is designed to be public), but all OpenAI traffic routes through the Express proxy.
 
 ### AI / ML Services
 
@@ -27,18 +28,25 @@
 
 ## 2\. System Architecture Overview
 
-The system is a client-heavy single-page app supported by a lightweight custom backend. This backend's primary role is to secure API secrets and serve as a secure proxy for key AI services, such as running Whisper for authoritative transcription. This approach allows the team to maintain a simple, client-heavy focus while improving security and control over core AI operations.
+The system is a client-heavy single-page app with a thin Express proxy that secures API keys and forwards all OpenAI traffic. The frontend never talks to OpenAI directly — every AI call (ChatGPT, Whisper, TTS) goes through the proxy. Supabase is still called directly from the browser since its anon key is designed to be public.
 
-**React Frontend** → talks directly to two external services (no custom backend server):
+**React Frontend** → **Express Proxy** → **OpenAI APIs**
+**React Frontend** → **Supabase** (direct)
 
 - **Screen flow:** Setup Screen → Interview Screen → Feedback Screen → (loop back via "Try Again" or "Next Question")
-- **Interview Screen** sends audio blobs and text to external APIs
+- **Interview Screen** sends audio blobs and text to the Express proxy, which forwards to OpenAI
+
+**Express Proxy** (API gateway):
+
+- Holds the OpenAI API key server-side
+- Proxies ChatGPT scoring, Whisper transcription, and TTS generation
+- Streams ChatGPT responses back to the client for lower perceived latency
 
 **Supabase** (data persistence):
 
-- Sessions, scores, questions
+- Sessions, scores, questions — called directly from the frontend
 
-**OpenAI APIs** (AI services):
+**OpenAI APIs** (AI services, accessed via proxy):
 
 - ChatGPT — scoring, question context, feedback
 - Whisper — speech-to-text
@@ -46,10 +54,10 @@ The system is a client-heavy single-page app supported by a lightweight custom b
 
 ### Data Flow — One Interview Loop
 
-1. **Setup → Interview:** User picks role \+ difficulty. Frontend fetches a question from the question bank (Supabase or local seed data). TTS converts the question text to audio. Audio plays through the browser.
-2. **Interview — Recording:** User speaks. MediaRecorder captures audio chunks. Live transcript updates via Web Speech API (browser-native, zero cost) for real-time display. When the user clicks "I'm done," the full audio blob is sent to Whisper for the authoritative transcript.
-3. **Interview → Scoring:** The authoritative Whisper transcript \+ original question are sent to ChatGPT with the scoring prompt. ChatGPT returns structured JSON: rubric scores, suggestions, and a follow-up prompt.
-4. **Scoring → Feedback:** Frontend renders the scorecard, suggestions, and follow-up. Session data (transcript, scores, question) is written to Supabase.
+1. **Setup → Interview:** User picks role \+ difficulty. Frontend fetches a question from the question bank (Supabase or local seed data). Frontend calls the proxy's TTS endpoint to convert the question text to audio. Audio plays through the browser.
+2. **Interview — Recording:** User speaks. MediaRecorder captures audio chunks. Live transcript updates via Web Speech API (browser-native, zero cost) for real-time display. When the user clicks "I'm done," the full audio blob is sent to the proxy's Whisper endpoint for the authoritative transcript.
+3. **Interview → Scoring:** The authoritative Whisper transcript \+ original question are sent to the proxy's scoring endpoint, which forwards to ChatGPT. ChatGPT returns structured JSON: rubric scores, suggestions, and a follow-up prompt. The proxy streams this response back to the frontend.
+4. **Scoring → Feedback:** Frontend renders the scorecard, suggestions, and follow-up. Session data (transcript, scores, question) is written to Supabase (direct).
 5. **Feedback → Loop:** User picks "Try Again" (same question, new attempt) or "Next Question" (new question from the bank). On retry, previous attempt data is kept for side-by-side comparison.
 
 ### Why Two STT Paths?
@@ -164,12 +172,89 @@ The state resets on "Next Question" and partially resets on "Try Again" (keep `p
 
 ---
 
-## 5\. Audio Pipeline
+## 5\. Backend Architecture
+
+The backend is a thin Express proxy — its only job is to keep the OpenAI API key off the client and forward requests. It does not own business logic, store state, or talk to Supabase. All three OpenAI services (ChatGPT, Whisper, TTS) are proxied through it.
+
+### Tech Choice
+
+Express on Node.js with TypeScript. Runs as a separate process alongside the Vite dev server during development.
+
+- _Why Express:_ The team already knows it, setup is minimal, and the proxy overhead (~1ms) is irrelevant next to 2-8 second OpenAI round trips.
+- _Why not serverless (e.g., Supabase Edge Functions):_ Cold starts add latency to every first request. A long-running Express process avoids this entirely.
+
+### API Routes
+
+| Method | Route | Proxies To | Request Body | Response |
+| :----- | :-------------- | :--------------- | :--------------------------------- | :--------------------------------------- |
+| POST | `/api/score` | ChatGPT (gpt-4o) | `{ transcript, question }` | Streamed JSON (SSE) — scoring result |
+| POST | `/api/transcribe` | Whisper (whisper-1) | `multipart/form-data` (audio file) | `{ text: "..." }` |
+| POST | `/api/tts` | TTS (tts-1) | `{ text, voice? }` | Audio binary (`audio/mpeg`) |
+
+All routes:
+
+- Read `OPENAI_API_KEY` from server-side environment (not `VITE_`-prefixed, never sent to the browser)
+- Return OpenAI errors as-is with appropriate HTTP status codes
+- Have no authentication — acceptable for a hackathon with a local/trusted network
+
+### Streaming (Scoring Endpoint)
+
+The `/api/score` endpoint streams the ChatGPT response back to the frontend using Server-Sent Events (SSE). This lets the frontend start rendering feedback as tokens arrive instead of waiting for the full response (~3-8 seconds).
+
+```
+// Server: pipe OpenAI stream to response
+res.setHeader('Content-Type', 'text/event-stream');
+const stream = await openai.chat.completions.create({
+  model: 'gpt-4o',
+  messages: [...],
+  response_format: { type: 'json_object' },
+  stream: true,
+});
+for await (const chunk of stream) {
+  res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+}
+res.end();
+```
+
+For the hackathon, the frontend can also fall back to buffering the full response if streaming parsing proves tricky — the non-streamed round trip is still under 8 seconds.
+
+### File Uploads (Whisper Endpoint)
+
+The `/api/transcribe` endpoint accepts `multipart/form-data` using `multer` (in-memory storage). The audio blob from the frontend's MediaRecorder is forwarded directly to Whisper — no disk writes, no temp files.
+
+### CORS
+
+The proxy runs on a different port than Vite's dev server, so CORS is configured to allow requests from the frontend origin (`http://localhost:5173` in dev). In production, this would be locked to the deployed frontend URL.
+
+### Server Setup
+
+```
+// server/index.ts
+import express from 'express';
+import cors from 'cors';
+import multer from 'multer';
+
+const app = express();
+app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173' }));
+app.use(express.json());
+
+const upload = multer({ storage: multer.memoryStorage() });
+
+app.post('/api/score', scoreHandler);
+app.post('/api/transcribe', upload.single('audio'), transcribeHandler);
+app.post('/api/tts', ttsHandler);
+
+app.listen(process.env.PORT || 3001);
+```
+
+---
+
+## 6\. Audio Pipeline
 
 ### TTS (Question → Speaker)
 
-1. Question text is sent to OpenAI TTS API (model: `tts-1`, voice: `alloy`)
-2. ArrayBuffer response is returned
+1. Question text is sent to the proxy's `/api/tts` endpoint, which forwards to OpenAI TTS (model: `tts-1`, voice: `alloy`)
+2. Audio Blob response is returned
 3. AudioContext / `<audio>` element handles playback
 4. WaveformVisualizer reads from AnalyserNode during playback
 
@@ -194,10 +279,10 @@ The state resets on "Next Question" and partially resets on "Try Again" (keep `p
 
 1. User clicks "I'm done"
 2. `MediaRecorder.stop()` produces final audio Blob (webm/opus)
-3. POST to OpenAI Whisper API (model: `whisper-1`)
+3. POST to proxy's `/api/transcribe` endpoint (multipart form data), which forwards to Whisper (model: `whisper-1`)
 4. Returns `{ text: "..." }` — this transcript is what gets scored
 
-- Send as `file` in multipart form data. Whisper accepts webm.
+- Frontend sends as `multipart/form-data`. The proxy uses `multer` to receive the blob and forwards it to Whisper.
 - Expected latency: 2-5 seconds for a 1-3 minute answer.
 - During this wait, show a "thinking" state with the waveform doing a subtle idle animation — matches the PRD's "interviewer collecting their thoughts" moment.
 
@@ -219,7 +304,7 @@ Words-per-minute is calculated as `wordCount / (elapsedSeconds / 60)`, updated e
 
 ---
 
-## 6\. AI Integration — Scoring Pipeline
+## 7\. AI Integration — Scoring Pipeline
 
 ### Scoring Prompt
 
@@ -257,12 +342,13 @@ The scoring API is a single ChatGPT call. The prompt structure:
 
 ---
 
-## 7\. Key Technical Decisions
+## 8\. Key Technical Decisions
 
-**Backend** — No custom backend; frontend calls Supabase \+ OpenAI directly.
+**Backend** — Thin Express proxy for all OpenAI calls; Supabase called directly from the frontend.
 
-- _Why:_ Eliminates a deployment target and the need for someone to own server code. API keys are in env vars loaded by Vite.
-- _Alternative:_ Express/Node server — adds ops overhead, no clear benefit for MVP scope.
+- _Why:_ Keeps API keys off the client without adding meaningful latency. Express adds ~1ms of overhead per request — invisible next to 2-8 second OpenAI round trips. The proxy is stateless and simple enough for one person to own.
+- _Alternative considered:_ No backend (frontend calls OpenAI directly with `dangerouslyAllowBrowser: true`) — exposes API keys in the browser bundle. Acceptable for a local-only hackathon demo but a bad habit to build on.
+- _Alternative considered:_ Supabase Edge Functions — cold starts add latency to first requests; team is less familiar with Deno runtime.
 
 **Live STT** — Web Speech API (browser-native).
 
@@ -294,17 +380,24 @@ The scoring API is a single ChatGPT call. The prompt structure:
 - _Why:_ Avoids re-calling TTS on retries. Lost on page refresh, which is fine.
 - _Alternative:_ localStorage/IndexedDB — overkill for a hackathon.
 
-**API key exposure** — Keys in Vite env vars, loaded client-side.
+**API key security** — OpenAI key lives server-side only; Supabase anon key stays client-side.
 
-- _Why:_ Acceptable for a hackathon. Not acceptable for production. Keys are on the team's accounts with spending caps set.
-- _Alternative:_ Proxy server to hide keys — adds infra we don't have time to build.
+- _Why:_ The Express proxy keeps the OpenAI key out of the browser bundle. Supabase's anon key is designed to be public (Row Level Security handles access control), so it's safe client-side.
+- _Previous approach:_ Keys in Vite env vars with `dangerouslyAllowBrowser: true` — replaced by the proxy.
 
 ---
 
-## 8\. Project Structure
+## 9\. Project Structure
 
 **polyprompts/**
 
+- **server/**
+  - `index.ts` — Express app entry point, route registration, CORS
+  - **routes/**
+    - `score.ts` — `/api/score` handler (ChatGPT proxy, SSE streaming)
+    - `transcribe.ts` — `/api/transcribe` handler (Whisper proxy, multer upload)
+    - `tts.ts` — `/api/tts` handler (TTS proxy, binary audio response)
+  - `openai.ts` — Server-side OpenAI client (reads `OPENAI_API_KEY` from env)
 - **public/**
   - **audio/** — Pre-recorded TTS fallback files
 - **src/**
@@ -323,8 +416,8 @@ The scoring API is a single ChatGPT call. The prompt structure:
     - `ScoreCard.tsx`, `SuggestionsList.tsx`
     - `FollowUpPrompt.tsx`, `RetryComparison.tsx`, `ActionButtons.tsx`
   - **services/**
-    - `openai.ts` — ChatGPT, Whisper, TTS API wrappers
-    - `supabase.ts` — Supabase client \+ queries
+    - `api.ts` — Frontend HTTP client for the Express proxy (`/api/score`, `/api/transcribe`, `/api/tts`)
+    - `supabase.ts` — Supabase client \+ queries (direct, no proxy)
     - `speechRecognition.ts` — Web Speech API wrapper
     - `audioRecorder.ts` — MediaRecorder wrapper
   - **hooks/**
@@ -336,7 +429,7 @@ The scoring API is a single ChatGPT call. The prompt structure:
     - `index.ts` — Shared TypeScript interfaces
   - **data/**
     - `questions.ts` — Local fallback question bank
-- `.env.example`, `package.json`, `vite.config.ts`
+- `.env.example` (frontend — Supabase keys only), `server/.env.example` (backend — OpenAI key), `package.json`, `vite.config.ts`
 
 ### File Ownership (maps to kickoff-checklist assignments)
 
@@ -344,34 +437,83 @@ The scoring API is a single ChatGPT call. The prompt structure:
 - **Frontend Dev A:** `screens/InterviewScreen.tsx`, `components/Waveform*`, `TranscriptPanel`, `CoachingMetrics`, `DoneButton`, `SilenceNudge`
 - **Frontend Dev B:** `screens/FeedbackScreen.tsx`, `components/ScoreCard`, `SuggestionsList`, `FollowUpPrompt`, `RetryComparison`, `ActionButtons`
 - **Product Lead:** `screens/SetupScreen.tsx`, `components/RoleSelector`, `DifficultySelector`, overall styling
-- **Backend/AI Dev:** `services/openai.ts`, `services/supabase.ts`, scoring prompt, question seeding
+- **Backend/AI Dev:** `server/` (all proxy routes), `services/api.ts`, scoring prompt, question seeding
 
 ---
 
-## 9\. Environment & Configuration
+## 10\. Environment & Configuration
 
-### Environment Variables (`.env.example`)
+### Frontend Environment Variables (`.env.example`)
 
 | Variable                 | Example Value                      |
 | :----------------------- | :--------------------------------- |
-| `VITE_OPENAI_API_KEY`    | `sk-...`                           |
 | `VITE_SUPABASE_URL`      | `https://your-project.supabase.co` |
 | `VITE_SUPABASE_ANON_KEY` | `eyJ...`                           |
+| `VITE_API_URL`           | `http://localhost:3001`            |
 
-All prefixed with `VITE_` so Vite exposes them to the client bundle. Again — this is a hackathon pattern, not a production pattern.
+The frontend only needs Supabase keys (safe to expose) and the proxy URL. No OpenAI key on the client.
 
-### OpenAI SDK Setup
+### Server Environment Variables (`server/.env.example`)
 
-`import OpenAI from 'openai';`
+| Variable          | Example Value           |
+| :---------------- | :---------------------- |
+| `OPENAI_API_KEY`  | `sk-...`                |
+| `PORT`            | `3001`                  |
+| `CORS_ORIGIN`     | `http://localhost:5173` |
 
-`const openai = new OpenAI({`
-`apiKey: import.meta.env.VITE_OPENAI_API_KEY,`
-`dangerouslyAllowBrowser: true,  // Required for client-side usage`
-`});`
+The OpenAI key lives here — server-side only, never bundled into the frontend.
 
-`dangerouslyAllowBrowser: true` is required because the OpenAI SDK warns against client-side usage by default. This is fine for a hackathon with spending caps on the API key.
+### OpenAI SDK Setup (Server-Side)
 
-### Supabase Client Setup
+```
+// server/openai.ts
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+export default openai;
+```
+
+No `dangerouslyAllowBrowser` needed — this runs on the server.
+
+### Frontend API Client Setup
+
+```
+// src/services/api.ts
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+export async function transcribeAudio(audioBlob: Blob): Promise<string> {
+  const form = new FormData();
+  form.append('audio', audioBlob, 'recording.webm');
+  const res = await fetch(`${API_URL}/api/transcribe`, { method: 'POST', body: form });
+  const data = await res.json();
+  return data.text;
+}
+
+export async function scoreAnswer(transcript: string, question: string): Promise<ScoringResult> {
+  const res = await fetch(`${API_URL}/api/score`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ transcript, question }),
+  });
+  // For non-streaming fallback; streaming version uses EventSource
+  const data = await res.json();
+  return data;
+}
+
+export async function textToSpeech(text: string): Promise<Blob> {
+  const res = await fetch(`${API_URL}/api/tts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  });
+  return res.blob();
+}
+```
+
+### Supabase Client Setup (unchanged — still direct from frontend)
 
 `import { createClient } from '@supabase/supabase-js';`
 
@@ -382,7 +524,7 @@ All prefixed with `VITE_` so Vite exposes them to the client bundle. Again — t
 
 ---
 
-## 10\. Performance Budget
+## 11\. Performance Budget
 
 These aren't hard requirements — they're targets that keep the demo feeling responsive.
 
