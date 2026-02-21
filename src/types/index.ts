@@ -11,8 +11,9 @@ export interface Question {
 }
 
 export interface DimensionScore {
-  level: ScoreLevel;
-  explanation: string;
+  level: ScoreLevel | null;
+  explanation: string | null;
+  percent?: number | null;
 }
 
 export interface ScoringResult {

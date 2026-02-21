@@ -4,18 +4,56 @@
   min-height: 100vh;
   padding: 3.5rem 2.5rem 4.5rem;
   color: #f7f7f7;
-  background: radial-gradient(circle at top, rgba(255, 255, 255, 0.12), transparent 55%),
-    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.08), transparent 40%),
-    #0a0a0a;
   font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+  background: black;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.feedback::after,
+.feedback::before {
+  z-index: 0;
+}
+
+.feedback::before,
+.feedback::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(2.4px 2.4px at 18px 24px, rgba(255, 255, 255, 0.95), transparent 70%),
+    radial-gradient(1.6px 1.6px at 62px 96px, rgba(255, 255, 255, 0.85), transparent 70%),
+    radial-gradient(2px 2px at 120px 44px, rgba(255, 255, 255, 0.9), transparent 70%),
+    radial-gradient(1.4px 1.4px at 176px 120px, rgba(255, 255, 255, 0.75), transparent 70%),
+    radial-gradient(2.8px 2.8px at 216px 34px, rgba(255, 255, 255, 0.95), transparent 70%),
+    radial-gradient(1.8px 1.8px at 260px 168px, rgba(255, 255, 255, 0.85), transparent 70%),
+    radial-gradient(1.6px 1.6px at 310px 78px, rgba(255, 255, 255, 0.8), transparent 70%),
+    radial-gradient(2.2px 2.2px at 356px 210px, rgba(255, 255, 255, 0.9), transparent 70%),
+    radial-gradient(1.6px 1.6px at 402px 144px, rgba(255, 255, 255, 0.8), transparent 70%);
+  background-size: 200px 150px;
+  opacity: 0.95;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.4));
+  animation: starTwinkle 2s ease-in-out infinite;
+}
+
+.feedback::after {
+  background-size: 280px 220px;
+  opacity: 0;
+  animation-duration: 6s;
+  animation-delay: -2.5s;
+  transform: translateY(0);
 }
 
 .feedback__frame {
-  max-width: 1320px;
+  /* max-width: 1320px; */
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 2.5rem;
+  margin-left: 2rem;
+  position: relative;
+  z-index: 1;
 }
 
 .feedback__header {
@@ -23,7 +61,7 @@
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 2rem;
-  align-items: flex-end;
+  /* align-items: flex-end; */
   animation: fadeUp 0.6s ease both;
 }
 
@@ -76,10 +114,11 @@
 .scoreboard {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(240px, 320px) minmax(360px, 1fr);
+  grid-template-columns: minmax(240px, 700px) minmax(360px, 1fr);
   gap: 1.75rem;
   padding: 1.75rem;
-  max-width: 900px;
+  /* max-width: 900px; */
+  max-width: auto;
   margin: 0;
   border-radius: 26px;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -99,6 +138,8 @@
 .scoreboard__radar {
   position: relative;
   display: grid;
+  /* grid-template-rows: minmax(240px, 2fr) minmax(360px, 1fr); */
+
   place-items: start center;
   align-content: start;
   gap: 1rem;
@@ -106,8 +147,9 @@
 }
 
 .scoreboard__radar svg {
-  width: min(240px, 55vw);
+  width: min(320px, 100%);
   height: auto;
+  aspect-ratio: 1;
   overflow: visible;
 }
 
@@ -117,7 +159,7 @@
 }
 
 .scoreboard__label {
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   text-transform: uppercase;
   letter-spacing: 0.14em;
   fill: #d7d7d7;
@@ -128,10 +170,10 @@
   display: grid;
   gap: 0.3rem;
   padding: 1rem 1.25rem;
-  border-radius: 16px;
+  /* border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(10, 10, 10, 0.9);
-  box-shadow: 0 0 25px rgba(255, 255, 255, 0.15);
+  background: rgba(10, 10, 10, 0.9); */
+  /* box-shadow: 0 0 25px rgba(255, 255, 255, 0.15); */
   justify-self: center;
 }
 
@@ -166,6 +208,7 @@
   background: rgba(8, 8, 8, 0.75);
   box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.03);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
 }
 
 .scoreboard__row:hover {
@@ -178,12 +221,18 @@
   justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.scoreboard__row-header div {
+  min-width: 0;
 }
 
 .scoreboard__row-header p {
   margin: 0;
   font-size: 0.82rem;
   font-weight: 600;
+  word-break: break-word;
 }
 
 .scoreboard__row-header span {
@@ -196,6 +245,8 @@
 .scoreboard__row-header strong {
   font-size: 0.82rem;
   color: #f1f1f1;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
 }
 
 .scoreboard__bar {
@@ -222,6 +273,7 @@
   max-height: 0;
   opacity: 0;
   overflow: hidden;
+  max-width: 100%;
   transform: translateY(-4px);
   transition: max-height 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
@@ -235,10 +287,17 @@
 
 .feedback__main {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
   gap: 2rem;
   align-items: start;
   animation: fadeUp 0.7s ease both 0.2s;
+  margin-top: -0.75rem;
+}
+
+.feedback__left {
+  display: grid;
+  gap: 1.5rem;
+  align-items: start;
 }
 
 .feedback__main .scoreboard {
@@ -282,6 +341,7 @@
 .feedback__card--review {
   border-style: solid;
   background: rgba(12, 12, 12, 0.9);
+  width: 100%;
 }
 
 .feedback__review-header {
@@ -394,6 +454,7 @@
   flex-wrap: wrap;
   gap: 1rem;
   animation: fadeUp 0.7s ease both 0.25s;
+  justify-content: center;
 }
 
 .feedback__button {
@@ -406,6 +467,7 @@
   text-transform: uppercase;
   letter-spacing: 0.2em;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  width: 100%;
 }
 
 .feedback__button:hover {
@@ -433,6 +495,17 @@
   }
 }
 
+@media (max-width: 640px) {
+  .scoreboard__row-header {
+    align-items: flex-start;
+  }
+
+  .scoreboard__row-header strong {
+    width: 100%;
+    text-align: left;
+  }
+}
+
 @keyframes fadeUp {
   from {
     opacity: 0;
@@ -451,5 +524,23 @@
   }
   50% {
     box-shadow: 0 0 65px rgba(255, 255, 255, 0.2), inset 0 0 45px rgba(255, 255, 255, 0.08);
+  }
+}
+
+@keyframes starTwinkle {
+  0% {
+    opacity: 0.22;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 0.55;
+  }
+  70% {
+    opacity: 0.32;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 0.28;
+    transform: translateY(0);
   }
 }
