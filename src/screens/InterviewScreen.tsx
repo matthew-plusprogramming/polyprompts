@@ -9,8 +9,6 @@ import { seededQuestions } from '../data/questions';
 import { countFillers } from '../hooks/useFillerDetection';
 import WaveformVisualizer from '../components/WaveformVisualizer';
 import SilenceNudge from '../components/SilenceNudge';
-import DoneButton from '../components/DoneButton';
-import CoachingMetrics from '../components/CoachingMetrics';
 import cameraOnIcon from '../Icons/CameraOn.png';
 import cameraOffIcon from '../Icons/cameraOff.png';
 import starlyIcon from '../Icons/StarlyLogo.png';
@@ -41,7 +39,6 @@ export default function InterviewScreen() {
   const [cameraEnabled, setCameraEnabled] = useState(true);
 
   // ─── Matthew's orchestration state ───
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [phase, setPhase] = useState<ScreenPhase>('ready');
   // Status text is set by orchestration callbacks for potential future UI display
@@ -423,13 +420,6 @@ export default function InterviewScreen() {
     }
   }, [state.currentQuestion, navigate]);
 
-  // Responsive
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 639px)');
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
 
   // Keep context transcript in sync
   useEffect(() => {
@@ -484,7 +474,6 @@ export default function InterviewScreen() {
   const micEnabled = phase === 'recording' || phase === 'silence-detected' || phase === 'asking-done';
 
   const showTranscript = phase === 'recording' || phase === 'silence-detected' || phase === 'asking-done';
-  const showDoneButton = phase === 'recording' || phase === 'silence-detected' || phase === 'asking-done';
 
   // ─── Phase badge config ───
   const phaseLabel: Record<ScreenPhase, string> = {
@@ -1289,23 +1278,6 @@ export default function InterviewScreen() {
           </div>
         )}
 
-        {/* Coaching metrics row */}
-        {showTranscript && (
-          <div style={{ marginTop: '0.5rem' }}>
-            <CoachingMetrics
-              fillerCount={state.fillerCount}
-              wordsPerMinute={state.wordsPerMinute}
-              speakingDurationSeconds={state.speakingDurationSeconds}
-            />
-          </div>
-        )}
-
-        {/* Done button (Space key shortcut) */}
-        {showDoneButton && (
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.5rem' }}>
-            <DoneButton onDone={handleDone} disabled={phase !== 'recording' && phase !== 'silence-detected'} isMobile={isMobile} />
-          </div>
-        )}
       </section>
     </div>
   );
