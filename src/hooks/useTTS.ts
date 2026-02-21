@@ -1,44 +1,128 @@
 import { useState, useRef, useCallback } from 'react';
 import { textToSpeech } from '../services/openai';
 
+const PLAYBACK_TIMEOUT_MS = 8000;
+const MAX_RETRIES = 2;
+const RETRY_BACKOFF_MS = 500;
+
 export function useTTS() {
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
 
-  const speak = useCallback(async (text: string) => {
+  const cleanupAudio = useCallback(() => {
     if (audioRef.current) {
+      audioRef.current.onended = null;
+      audioRef.current.onerror = null;
+      audioRef.current.oncanplaythrough = null;
       audioRef.current.pause();
+      audioRef.current.src = '';
       audioRef.current = null;
     }
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+  }, []);
+
+  const speakWithNativeFallback = useCallback((text: string) => {
+    return new Promise<void>((resolve, reject) => {
+      if (!('speechSynthesis' in window)) {
+        reject(new Error('speechSynthesis not supported'));
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      utterance.onend = () => resolve();
+      utterance.onerror = (event) => reject(new Error(`SpeechSynthesis error: ${event.error}`));
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    });
+  }, []);
+
+  const fetchWithRetry = useCallback(async (text: string, voice?: string, speed?: number): Promise<Blob> => {
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        return await textToSpeech(text, voice, speed);
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        console.warn(`[TTS] Fetch attempt ${attempt + 1} failed:`, lastError.message);
+        if (attempt < MAX_RETRIES) {
+          await new Promise((r) => setTimeout(r, RETRY_BACKOFF_MS * (attempt + 1)));
+        }
+      }
+    }
+    throw lastError;
+  }, []);
+
+  const playBlob = useCallback((blob: Blob): Promise<void> => {
+    return new Promise<void>((resolve, reject) => {
+      cleanupAudio();
+
+      const objectUrl = URL.createObjectURL(blob);
+      objectUrlRef.current = objectUrl;
+      const audio = new Audio();
+      audioRef.current = audio;
+      audio.preload = 'auto';
+
+      // Timeout: if audio doesn't start playing within threshold, reject
+      const playbackTimeout = setTimeout(() => {
+        console.warn('[TTS] Playback timeout — audio did not start in time');
+        reject(new Error('Playback timeout'));
+      }, PLAYBACK_TIMEOUT_MS);
+
+      audio.oncanplaythrough = () => {
+        clearTimeout(playbackTimeout);
+        audio.play().catch(reject);
+      };
+
+      audio.onended = () => {
+        console.log('[TTS] Playback ended');
+        resolve();
+      };
+
+      audio.onerror = () => {
+        clearTimeout(playbackTimeout);
+        reject(new Error('HTMLAudio playback error'));
+      };
+
+      audio.src = objectUrl;
+    });
+  }, [cleanupAudio]);
+
+  const speak = useCallback(async (text: string, voice?: string, speed?: number) => {
+    cleanupAudio();
+    window.speechSynthesis?.cancel();
 
     setIsPlaying(true);
     try {
-      const blob = await textToSpeech(text);
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audioRef.current = audio;
+      console.log('[TTS] Fetching audio...');
+      const blob = await fetchWithRetry(text, voice, speed);
+      console.log('[TTS] Got blob, size:', blob.size, 'type:', blob.type);
 
-      await new Promise<void>((resolve, reject) => {
-        audio.onended = () => {
-          URL.revokeObjectURL(url);
-          resolve();
-        };
-        audio.onerror = () => reject(new Error('Audio playback failed'));
-        audio.play();
-      });
+      console.log('[TTS] Playing...');
+      await playBlob(blob);
+    } catch (error) {
+      console.error('[TTS] OpenAI TTS failed, falling back to speechSynthesis:', error);
+      try {
+        await speakWithNativeFallback(text);
+      } catch (fallbackError) {
+        console.error('[TTS] Native fallback also failed:', fallbackError);
+        throw fallbackError;
+      }
     } finally {
       setIsPlaying(false);
-      audioRef.current = null;
+      cleanupAudio();
     }
-  }, []);
+  }, [cleanupAudio, fetchWithRetry, playBlob, speakWithNativeFallback]);
 
   const stopPlayback = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
+    cleanupAudio();
+    window.speechSynthesis?.cancel();
     setIsPlaying(false);
-  }, []);
+  }, [cleanupAudio]);
 
   return { speak, isPlaying, stopPlayback };
 }

@@ -1,22 +1,44 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { InterviewProvider } from './context/InterviewContext';
 import SetupScreen from './screens/SetupScreen';
 
 const InterviewScreen = lazy(() => import('./screens/InterviewScreen'));
 const FeedbackScreen = lazy(() => import('./screens/FeedbackScreen'));
 
+const loadingFallback = (
+  <div style={{
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#09090f',
+    color: '#64748b',
+    fontFamily: "'DM Sans', sans-serif",
+    fontSize: '14px',
+  }}>
+    Loading...
+  </div>
+);
+
 export default function App() {
   return (
     <BrowserRouter>
       <InterviewProvider>
-        <Suspense fallback={<div style={{ padding: '2rem' }}>Loading...</div>}>
-          <Routes>
-            <Route path="/" element={<SetupScreen />} />
-            <Route path="/interview" element={<InterviewScreen />} />
-            <Route path="/feedback" element={<FeedbackScreen />} />
-          </Routes>
-        </Suspense>
+        <Routes>
+          <Route path="/" element={<div className="page-enter"><SetupScreen /></div>} />
+          <Route path="/interview" element={
+            <Suspense fallback={loadingFallback}>
+              <div className="page-enter"><InterviewScreen /></div>
+            </Suspense>
+          } />
+          <Route path="/feedback" element={
+            <Suspense fallback={loadingFallback}>
+              <div className="page-enter"><FeedbackScreen /></div>
+            </Suspense>
+          } />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </InterviewProvider>
     </BrowserRouter>
   );

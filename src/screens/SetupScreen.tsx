@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback, type DragEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInterview } from '../context/InterviewContext';
-import { seededQuestions } from '../data/questions';
-import { Difficulty, Role } from '../types';
+import { seededQuestions, categoryDescriptions, difficultyDescriptions } from '../data/questions';
+import { generateResumeQuestion } from '../services/openai';
+import type { Difficulty, Role, ResumeData } from '../types';
+import FlowProgress from '../components/FlowProgress';
 
 /* ─────────────────────────────────────────────
    DATA
@@ -25,18 +27,55 @@ const DIFFICULTIES = [
 ] as const;
 
 const CATEGORIES = [
-  { id: 'random', label: 'Random', icon: '🎲' },
-  { id: 'teamwork', label: 'Teamwork', icon: '🤝' },
-  { id: 'leadership', label: 'Leadership', icon: '🔥' },
-  { id: 'conflict', label: 'Conflict', icon: '⚡' },
-  { id: 'failure', label: 'Failure / Mistake', icon: '🌀' },
+  { id: 'random', label: 'Random', icon: '🎲', desc: 'Any category — keeps you on your toes' },
+  { id: 'teamwork', label: 'Teamwork', icon: '🤝', desc: 'Working effectively with others toward shared goals' },
+  { id: 'leadership', label: 'Leadership', icon: '🔥', desc: 'Guiding others and taking initiative on projects' },
+  { id: 'conflict', label: 'Conflict', icon: '⚡', desc: 'Navigating disagreements and finding common ground' },
+  { id: 'failure', label: 'Failure / Mistake', icon: '🌀', desc: 'Learning and growing from setbacks' },
+] as const;
+
+const TTS_VOICES = [
+  { id: 'alloy', label: 'Alloy', hint: 'Neutral' },
+  { id: 'nova', label: 'Nova', hint: 'Warm' },
+  { id: 'shimmer', label: 'Shimmer', hint: 'Gentle' },
+  { id: 'echo', label: 'Echo', hint: 'Deep' },
+] as const;
+
+const TTS_SPEEDS = [
+  { value: 0.8, label: '0.8x', hint: 'Slower' },
+  { value: 1.0, label: '1.0x', hint: 'Normal' },
+  { value: 1.2, label: '1.2x', hint: 'Faster' },
 ] as const;
 
 const STAR_ITEMS = [
-  { letter: 'S', word: 'Situation', color: '#22d3ee', desc: 'Set the scene — time, place, stakes. Keep it tight.' },
-  { letter: 'T', word: 'Task', color: '#f59e0b', desc: 'Your specific responsibility. What was expected of YOU?' },
-  { letter: 'A', word: 'Action', color: '#a78bfa', desc: 'First-person, concrete steps. What did YOU do?' },
-  { letter: 'R', word: 'Result', color: '#34d399', desc: 'Measurable outcomes. Bonus: what did you learn?' },
+  {
+    letter: 'S',
+    word: 'Situation',
+    color: '#22d3ee',
+    desc: 'Set the scene — time, place, stakes. Keep it tight.',
+    example: '"In my sophomore year, our team was assigned a legacy codebase with no documentation..."',
+  },
+  {
+    letter: 'T',
+    word: 'Task',
+    color: '#f59e0b',
+    desc: 'Your specific responsibility. What was expected of YOU?',
+    example: '"I was responsible for refactoring the authentication module before the deadline..."',
+  },
+  {
+    letter: 'A',
+    word: 'Action',
+    color: '#a78bfa',
+    desc: 'First-person, concrete steps. What did YOU do?',
+    example: '"I mapped the existing logic, wrote unit tests first, then rewrote each function..."',
+  },
+  {
+    letter: 'R',
+    word: 'Result',
+    color: '#34d399',
+    desc: 'Measurable outcomes. Bonus: what did you learn?',
+    example: '"Login time dropped by 40%, and zero auth-related bugs were filed that semester..."',
+  },
 ] as const;
 
 /* ─────────────────────────────────────────────
@@ -279,6 +318,20 @@ function DifficultyPill({
       >
         {diff.label}
       </span>
+      {selected && (
+        <span
+          style={{
+            fontFamily: "'DM Mono',monospace",
+            fontSize: '10px',
+            color: `${diff.color}99`,
+            lineHeight: 1.4,
+            textAlign: 'center',
+            animation: 'fadeUp 0.18s ease forwards',
+          }}
+        >
+          {difficultyDescriptions[diff.id]}
+        </span>
+      )}
     </button>
   );
 }
@@ -286,7 +339,17 @@ function DifficultyPill({
 /* ─────────────────────────────────────────────
    CATEGORY CHIP
 ───────────────────────────────────────────── */
-function CategoryChip({ cat, selected, onClick }: { cat: (typeof CATEGORIES)[number]; selected: boolean; onClick: () => void }) {
+function CategoryChip({
+  cat,
+  selected,
+  onClick,
+  count,
+}: {
+  cat: (typeof CATEGORIES)[number];
+  selected: boolean;
+  onClick: () => void;
+  count: number | null;
+}) {
   const [hov, setHov] = useState(false);
   return (
     <button
@@ -324,6 +387,18 @@ function CategoryChip({ cat, selected, onClick }: { cat: (typeof CATEGORIES)[num
       >
         {cat.label}
       </span>
+      {count !== null && (
+        <span
+          style={{
+            fontFamily: "'DM Mono',monospace",
+            fontSize: '10px',
+            color: selected ? '#818cf8' : '#374151',
+            transition: 'color 0.18s',
+          }}
+        >
+          {count}
+        </span>
+      )}
     </button>
   );
 }
@@ -331,11 +406,8 @@ function CategoryChip({ cat, selected, onClick }: { cat: (typeof CATEGORIES)[num
 /* ─────────────────────────────────────────────
    RESUME UPLOAD ZONE
 ───────────────────────────────────────────── */
-interface ResumeData {
+interface LocalResumeData extends ResumeData {
   name: string;
-  skills: string[];
-  experiences: string[];
-  education: string;
 }
 
 function ResumeUpload({
@@ -345,8 +417,8 @@ function ResumeUpload({
   onRemove,
 }: {
   resumeFile: File | null;
-  resumeData: ResumeData | null;
-  onFileAccepted: (file: File, data: ResumeData) => void;
+  resumeData: LocalResumeData | null;
+  onFileAccepted: (file: File, data: LocalResumeData) => void;
   onRemove: () => void;
 }) {
   const [dragging, setDragging] = useState(false);
@@ -387,12 +459,16 @@ function ResumeUpload({
           setScanning(false);
           onFileAccepted(file, {
             name: file.name.replace(/\.[^/.]+$/, ''),
-            skills: ['React', 'Python', 'Node.js', 'SQL'].slice(0, 2 + Math.floor(Math.random() * 3)),
-            experiences: ['Software Engineering Intern', 'Research Assistant', 'Hackathon Winner'].slice(
-              0,
-              1 + Math.floor(Math.random() * 2)
-            ),
-            education: 'Cal Poly SLO · CS',
+            skills: ['React', 'TypeScript', 'Python', 'Node.js', 'SQL', 'Git'],
+            experience: [
+              'Software Engineering Intern at TechCorp - Built REST APIs and React dashboards',
+              'Teaching Assistant for Data Structures - Helped 120+ students with coding assignments',
+            ],
+            projects: [
+              'E-commerce Platform - Full-stack React/Node app with Stripe integration',
+              'ML Pipeline - Python data processing pipeline for sentiment analysis',
+            ],
+            education: 'B.S. Computer Science, State University, Expected 2027',
           });
         }, 350);
       }
@@ -546,8 +622,46 @@ function ResumeUpload({
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <HighlightRow icon="🎓" label="Education" value={resumeData.education} color="#22d3ee" />
-            <HighlightRow icon="💼" label="Experience" value={resumeData.experiences.join(', ')} color="#f59e0b" />
-            <HighlightRow icon="⚡" label="Skills" value={resumeData.skills.join(', ')} color="#a78bfa" />
+            <HighlightRow
+              icon="💼"
+              label="Experience"
+              value={`${resumeData.experience.length} ${resumeData.experience.length === 1 ? 'entry' : 'entries'} found`}
+              color="#f59e0b"
+            />
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+              <span style={{ fontSize: '12px', marginTop: '2px' }}>⚡</span>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '11px', color: '#4b5563', minWidth: '70px' }}>Skills</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', flex: 1 }}>
+                {resumeData.skills.slice(0, 6).map((skill) => (
+                  <span
+                    key={skill}
+                    style={{
+                      fontFamily: "'DM Mono', monospace",
+                      fontSize: '10px',
+                      color: '#a78bfacc',
+                      background: 'rgba(167,139,250,0.1)',
+                      border: '1px solid rgba(167,139,250,0.2)',
+                      borderRadius: '4px',
+                      padding: '1px 6px',
+                    }}
+                  >
+                    {skill}
+                  </span>
+                ))}
+                {resumeData.skills.length > 6 && (
+                  <span
+                    style={{
+                      fontFamily: "'DM Mono', monospace",
+                      fontSize: '10px',
+                      color: '#4b5563',
+                      padding: '1px 4px',
+                    }}
+                  >
+                    +{resumeData.skills.length - 6} more
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
 
           <div
@@ -888,9 +1002,11 @@ function StarModal({ onClose }: { onClose: () => void }) {
           background: '#0c0c13',
           border: '1px solid #222232',
           borderRadius: '22px',
-          padding: '36px',
-          maxWidth: '500px',
+          maxWidth: '520px',
           width: '100%',
+          maxHeight: 'calc(100vh - 48px)',
+          display: 'flex',
+          flexDirection: 'column',
           transform: `translateY(${vis ? 0 : 28}px) scale(${vis ? 1 : 0.95})`,
           opacity: vis ? 1 : 0,
           transition: 'all 0.28s cubic-bezier(0.34,1.56,0.64,1)',
@@ -899,6 +1015,7 @@ function StarModal({ onClose }: { onClose: () => void }) {
           overflow: 'hidden',
         }}
       >
+        {/* Top shimmer line */}
         <div
           style={{
             position: 'absolute',
@@ -907,133 +1024,298 @@ function StarModal({ onClose }: { onClose: () => void }) {
             right: '18%',
             height: '1px',
             background: 'linear-gradient(90deg,transparent,#6366f1,#22d3ee,transparent)',
+            zIndex: 1,
           }}
         />
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px' }}>
-          <div>
+
+        {/* Sticky header */}
+        <div style={{ padding: '32px 32px 20px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div
+                style={{
+                  fontFamily: "'DM Mono',monospace",
+                  fontSize: '10px',
+                  color: '#6366f1',
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                  marginBottom: '6px',
+                }}
+              >
+                About STAR
+              </div>
+              <h2
+                style={{
+                  margin: 0,
+                  fontFamily: "'Syne',sans-serif",
+                  fontSize: '24px',
+                  fontWeight: '800',
+                  color: '#f9fafb',
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                The STAR Framework
+              </h2>
+            </div>
+            <button
+              onClick={close}
+              style={{
+                background: '#191926',
+                border: '1px solid #222232',
+                borderRadius: '10px',
+                color: '#6b7280',
+                cursor: 'pointer',
+                width: '36px',
+                height: '36px',
+                fontSize: '18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'background 0.15s,color 0.15s',
+                flexShrink: 0,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#222232';
+                e.currentTarget.style.color = '#d1d5db';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#191926';
+                e.currentTarget.style.color = '#6b7280';
+              }}
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Intro paragraph */}
+          <p
+            style={{
+              marginTop: '14px',
+              marginBottom: 0,
+              fontFamily: "'DM Sans',sans-serif",
+              fontSize: '13px',
+              color: '#6b7280',
+              lineHeight: 1.65,
+            }}
+          >
+            The STAR method is a structured way to answer behavioral interview questions by describing a specific{' '}
+            <span style={{ color: '#22d3ee' }}>Situation</span>,{' '}
+            <span style={{ color: '#f59e0b' }}>Task</span>,{' '}
+            <span style={{ color: '#a78bfa' }}>Action</span>, and{' '}
+            <span style={{ color: '#34d399' }}>Result</span>.
+          </p>
+        </div>
+
+        {/* Scrollable body */}
+        <div
+          style={{
+            overflowY: 'auto',
+            padding: '0 32px 32px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px',
+          }}
+        >
+          {/* STAR items */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {STAR_ITEMS.map((item, i) => (
+              <div
+                key={item.letter}
+                onMouseEnter={() => setActiveIdx(i)}
+                onMouseLeave={() => setActiveIdx(null)}
+                style={{
+                  display: 'flex',
+                  gap: '14px',
+                  alignItems: 'flex-start',
+                  padding: '14px 16px',
+                  background: activeIdx === i ? `${item.color}0e` : '#09090f',
+                  border: `1px solid ${activeIdx === i ? `${item.color}38` : '#181822'}`,
+                  borderRadius: '12px',
+                  cursor: 'default',
+                  transition: 'all 0.18s ease',
+                  transform: activeIdx === i ? 'translateX(5px)' : 'translateX(0)',
+                }}
+              >
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '10px',
+                    flexShrink: 0,
+                    background: `${item.color}18`,
+                    border: `1px solid ${item.color}38`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontFamily: "'Syne',sans-serif",
+                    fontWeight: '800',
+                    fontSize: '16px',
+                    color: item.color,
+                  }}
+                >
+                  {item.letter}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontFamily: "'Syne',sans-serif",
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      color: item.color,
+                      marginBottom: '3px',
+                    }}
+                  >
+                    {item.word}
+                  </div>
+                  <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '13px', color: '#6b7280', lineHeight: 1.5, marginBottom: '8px' }}>
+                    {item.desc}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: "'DM Mono',monospace",
+                      fontSize: '11px',
+                      color: `${item.color}88`,
+                      lineHeight: 1.5,
+                      fontStyle: 'italic',
+                      paddingLeft: '8px',
+                      borderLeft: `2px solid ${item.color}30`,
+                    }}
+                  >
+                    Example: {item.example}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Tips for Strong Answers */}
+          <div
+            style={{
+              background: 'rgba(167,139,250,0.05)',
+              border: '1px solid rgba(167,139,250,0.15)',
+              borderRadius: '12px',
+              padding: '16px 18px',
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "'DM Mono',monospace",
+                fontSize: '10px',
+                color: '#a78bfa',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                marginBottom: '12px',
+                fontWeight: '700',
+              }}
+            >
+              Tips for Strong Answers
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {[
+                { icon: '→', text: 'Use "I" not "we" to show personal ownership' },
+                { icon: '→', text: 'Be specific — names, numbers, timelines' },
+                { icon: '→', text: 'Quantify results when possible' },
+                { icon: '→', text: 'Keep it under 2–3 minutes' },
+              ].map(({ icon, text }) => (
+                <div key={text} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <span
+                    style={{
+                      fontFamily: "'DM Mono',monospace",
+                      fontSize: '12px',
+                      color: '#a78bfa',
+                      flexShrink: 0,
+                      marginTop: '1px',
+                    }}
+                  >
+                    {icon}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "'DM Sans',sans-serif",
+                      fontSize: '13px',
+                      color: '#6b7280',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {text}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* How We Score */}
+          <div
+            style={{
+              background: 'rgba(99,102,241,0.05)',
+              border: '1px solid rgba(99,102,241,0.14)',
+              borderRadius: '12px',
+              padding: '16px 18px',
+            }}
+          >
             <div
               style={{
                 fontFamily: "'DM Mono',monospace",
                 fontSize: '10px',
                 color: '#6366f1',
-                letterSpacing: '0.12em',
+                letterSpacing: '0.1em',
                 textTransform: 'uppercase',
-                marginBottom: '6px',
+                marginBottom: '12px',
+                fontWeight: '700',
               }}
             >
-              Framework
+              How We Score
             </div>
-            <h2
-              style={{
-                margin: 0,
-                fontFamily: "'Syne',sans-serif",
-                fontSize: '24px',
-                fontWeight: '800',
-                color: '#f9fafb',
-                letterSpacing: '-0.02em',
-              }}
-            >
-              STAR Scoring
-            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+              {[
+                { level: 'Excellent', color: '#34d399', desc: 'Detailed, specific, measurable — a model answer' },
+                { level: 'Good', color: '#22d3ee', desc: 'Clear structure with minor gaps' },
+                { level: 'Developing', color: '#f59e0b', desc: 'Some STAR elements present but vague or incomplete' },
+                { level: 'Needs Work', color: '#f87171', desc: 'Missing key components or too short to assess' },
+              ].map(({ level, color, desc }) => (
+                <div key={level} style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+                  <span
+                    style={{
+                      fontFamily: "'DM Mono',monospace",
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      color,
+                      minWidth: '82px',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {level}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "'DM Sans',sans-serif",
+                      fontSize: '12px',
+                      color: '#4b5563',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {desc}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-          <button
-            onClick={close}
+
+          {/* Footer note */}
+          <div
             style={{
-              background: '#191926',
-              border: '1px solid #222232',
+              background: 'rgba(99,102,241,0.05)',
+              border: '1px solid rgba(99,102,241,0.12)',
               borderRadius: '10px',
-              color: '#6b7280',
-              cursor: 'pointer',
-              width: '36px',
-              height: '36px',
-              fontSize: '18px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'background 0.15s,color 0.15s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#222232';
-              e.currentTarget.style.color = '#d1d5db';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#191926';
-              e.currentTarget.style.color = '#6b7280';
+              padding: '12px 14px',
+              fontFamily: "'DM Mono',monospace",
+              fontSize: '11px',
+              color: '#6366f170',
+              lineHeight: 1.6,
             }}
           >
-            ×
-          </button>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
-          {STAR_ITEMS.map((item, i) => (
-            <div
-              key={item.letter}
-              onMouseEnter={() => setActiveIdx(i)}
-              onMouseLeave={() => setActiveIdx(null)}
-              style={{
-                display: 'flex',
-                gap: '14px',
-                alignItems: 'flex-start',
-                padding: '14px 16px',
-                background: activeIdx === i ? `${item.color}0e` : '#09090f',
-                border: `1px solid ${activeIdx === i ? `${item.color}38` : '#181822'}`,
-                borderRadius: '12px',
-                cursor: 'default',
-                transition: 'all 0.18s ease',
-                transform: activeIdx === i ? 'translateX(5px)' : 'translateX(0)',
-              }}
-            >
-              <div
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '10px',
-                  flexShrink: 0,
-                  background: `${item.color}18`,
-                  border: `1px solid ${item.color}38`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontFamily: "'Syne',sans-serif",
-                  fontWeight: '800',
-                  fontSize: '16px',
-                  color: item.color,
-                }}
-              >
-                {item.letter}
-              </div>
-              <div>
-                <div
-                  style={{
-                    fontFamily: "'Syne',sans-serif",
-                    fontSize: '13px',
-                    fontWeight: '700',
-                    color: item.color,
-                    marginBottom: '3px',
-                  }}
-                >
-                  {item.word}
-                </div>
-                <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '13px', color: '#6b7280', lineHeight: 1.5 }}>
-                  {item.desc}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div
-          style={{
-            background: 'rgba(99,102,241,0.05)',
-            border: '1px solid rgba(99,102,241,0.12)',
-            borderRadius: '10px',
-            padding: '12px 14px',
-            fontFamily: "'DM Mono',monospace",
-            fontSize: '11px',
-            color: '#6366f170',
-            lineHeight: 1.6,
-          }}
-        >
-          ⚡ Difficulty changes <em style={{ color: '#818cf8' }}>question complexity only</em> — all answers are held to the same STAR standard.
+            ⚡ Difficulty changes <em style={{ color: '#818cf8' }}>question complexity only</em> — all answers are held to the same STAR standard.
+          </div>
         </div>
       </div>
     </div>
@@ -1089,7 +1371,7 @@ function SectionLabel({ step, children, optional }: { step: string; children: Re
    MAIN
 ───────────────────────────────────────────── */
 export default function SetupScreen() {
-  const { dispatch } = useInterview();
+  const { state, dispatch } = useInterview();
   const navigate = useNavigate();
 
   const [role, setRole] = useState<UiRole | null>(null);
@@ -1097,11 +1379,10 @@ export default function SetupScreen() {
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]['id']>('random');
   const [mode, setMode] = useState<Mode>('generic');
   const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const [resumeData, setResumeData] = useState<ResumeData | null>(null);
+  const [resumeData, setResumeData] = useState<LocalResumeData | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [launching, setLaunching] = useState(false);
-  const [diffHint, setDiffHint] = useState<string | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 60);
@@ -1109,23 +1390,62 @@ export default function SetupScreen() {
   }, []);
 
   const selectedRole = ROLES.find((r) => r.id === role);
-  const selectedDiff = DIFFICULTIES.find((d) => d.id === difficulty);
   const canStart = Boolean(role) && (mode === 'generic' || (mode === 'resume' && resumeData));
 
   const toInterviewRole = (uiRole: UiRole): Role => {
     if (uiRole === 'pm') return 'pm_intern';
+    // ML: use SWE questions for now (future: ML-specific pool)
+    // Custom: role mapping is irrelevant — question selection uses ALL roles below
     return 'swe_intern';
   };
 
-  const handleStart = () => {
+  const handleStart = async () => {
     if (!canStart || launching || !role) return;
     setLaunching(true);
 
     const mappedRole = toInterviewRole(role);
     dispatch({ type: 'SET_ROLE', payload: mappedRole });
     dispatch({ type: 'SET_DIFFICULTY', payload: difficulty });
+    dispatch({ type: 'SET_TTS_VOICE', payload: state.ttsVoice });
 
-    const matching = seededQuestions.filter((q) => q.role === mappedRole && q.difficulty === difficulty);
+    if (mode === 'resume' && resumeData) {
+      // Build a seeded fallback upfront so we always have one ready
+      const matching = seededQuestions.filter((q) => q.role === mappedRole && q.difficulty === difficulty);
+      const pool = matching.length > 0 ? matching : seededQuestions;
+      const fallback = pool[Math.floor(Math.random() * pool.length)] ?? seededQuestions[0];
+
+      let question: import('../types').Question;
+      try {
+        const result = await generateResumeQuestion(
+          { skills: resumeData.skills, experience: resumeData.experience, projects: resumeData.projects, education: resumeData.education },
+          mappedRole,
+          difficulty,
+          category !== 'random' ? category : undefined,
+        );
+        question = {
+          id: 'resume-' + Date.now(),
+          text: result.text,
+          role: mappedRole,
+          difficulty,
+          category: result.category,
+        };
+      } catch (err) {
+        console.warn('generateResumeQuestion failed, falling back to seeded question.', err);
+        question = fallback;
+      }
+
+      dispatch({ type: 'SET_QUESTION', payload: question });
+      navigate('/interview');
+      return;
+    }
+
+    // Generic mode: pick from seeded questions
+    // Custom role: draw from ALL roles at the selected difficulty
+    const roleFiltered =
+      role === 'custom'
+        ? seededQuestions.filter((q) => q.difficulty === difficulty)
+        : seededQuestions.filter((q) => q.role === mappedRole && q.difficulty === difficulty);
+    const matching = roleFiltered;
     const categoryFiltered =
       category === 'random'
         ? matching
@@ -1150,20 +1470,60 @@ export default function SetupScreen() {
     }, 650);
   };
 
+  const handleQuickStart = () => {
+    const quickRole: Role = 'swe_intern';
+    const quickDifficulty: Difficulty = 'medium';
+    const pool = seededQuestions.filter((q) => q.role === quickRole && q.difficulty === quickDifficulty);
+    const question = pool[Math.floor(Math.random() * pool.length)] ?? seededQuestions[0];
+    dispatch({ type: 'SET_ROLE', payload: quickRole });
+    dispatch({ type: 'SET_DIFFICULTY', payload: quickDifficulty });
+    dispatch({ type: 'SET_QUESTION', payload: question });
+    navigate('/interview');
+  };
+
+  const getCategoryCount = (catId: (typeof CATEGORIES)[number]['id']): number | null => {
+    if (!role) return null;
+    const mappedRole = toInterviewRole(role as UiRole);
+    // Custom role: count across all roles
+    const matching =
+      role === 'custom'
+        ? seededQuestions.filter((q) => q.difficulty === difficulty)
+        : seededQuestions.filter((q) => q.role === mappedRole && q.difficulty === difficulty);
+    if (catId === 'random') return matching.length;
+    return matching.filter((q) => {
+      const qcat = (q.category ?? '').toLowerCase();
+      if (catId === 'teamwork') return qcat.includes('team');
+      if (catId === 'leadership') return qcat.includes('leader') || qcat.includes('priorit');
+      if (catId === 'conflict') return qcat.includes('conflict') || qcat.includes('disagree');
+      if (catId === 'failure') return qcat.includes('mistake') || qcat.includes('fail');
+      return false;
+    }).length;
+  };
+
   const stagger = (i: number) => ({
     opacity: mounted ? 1 : 0,
     transform: mounted ? 'translateY(0)' : 'translateY(22px)',
     transition: `opacity 0.5s ease ${i * 0.065}s, transform 0.55s cubic-bezier(0.34,1.56,0.64,1) ${i * 0.065}s`,
   });
 
-  const handleFileAccepted = (file: File, data: ResumeData) => {
+  const handleFileAccepted = (file: File, data: LocalResumeData) => {
     setResumeFile(file);
     setResumeData(data);
+    dispatch({
+      type: 'SET_RESUME_DATA',
+      payload: {
+        skills: data.skills,
+        experience: data.experience,
+        projects: data.projects,
+        education: data.education,
+      },
+    });
   };
 
   const handleRemove = () => {
     setResumeFile(null);
     setResumeData(null);
+    dispatch({ type: 'SET_RESUME_DATA', payload: { skills: [], experience: [], projects: [], education: '' } });
   };
 
   const progressItems = [role, 'diff', 'cat', mode === 'resume' ? (resumeData ? 'done' : null) : 'skip'];
@@ -1246,6 +1606,7 @@ export default function SetupScreen() {
         }}
       >
         <div style={{ width: '100%', maxWidth: '580px' }}>
+          <FlowProgress currentStep="setup" />
           <div style={{ textAlign: 'center', marginBottom: '40px', ...stagger(0) }}>
             <div
               style={{
@@ -1308,9 +1669,44 @@ export default function SetupScreen() {
               </span>
             </h1>
 
-            <p style={{ fontSize: '16px', color: '#6b7280', lineHeight: 1.6, maxWidth: '380px', margin: '0 auto' }}>
+            <p style={{ fontSize: '16px', color: '#6b7280', lineHeight: 1.6, maxWidth: '380px', margin: '0 auto 16px' }}>
               Speak your answer. Get <span style={{ color: '#a5b4fc' }}>STAR-based scoring</span> + coaching in seconds.
             </p>
+
+            <button
+              onClick={handleQuickStart}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 18px',
+                background: 'transparent',
+                border: '1px solid rgba(99,102,241,0.35)',
+                borderRadius: '100px',
+                cursor: 'pointer',
+                fontFamily: "'DM Mono',monospace",
+                fontSize: '12px',
+                fontWeight: '600',
+                color: '#818cf8',
+                transition: 'all 0.2s ease',
+                letterSpacing: '0.02em',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(99,102,241,0.1)';
+                e.currentTarget.style.borderColor = 'rgba(99,102,241,0.6)';
+                e.currentTarget.style.color = '#a5b4fc';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.borderColor = 'rgba(99,102,241,0.35)';
+                e.currentTarget.style.color = '#818cf8';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+            >
+              Quick Start →
+              <span style={{ fontSize: '10px', color: '#4b5563', fontWeight: '400' }}>SWE · Medium · Random</span>
+            </button>
           </div>
 
           <div
@@ -1391,15 +1787,12 @@ export default function SetupScreen() {
                     key={d.id}
                     diff={d}
                     selected={difficulty === d.id}
-                    onClick={() => {
-                      setDifficulty(d.id);
-                      setDiffHint(d.hint);
-                    }}
+                    onClick={() => setDifficulty(d.id)}
                   />
                 ))}
               </div>
               <div
-                key={diffHint ?? 'default'}
+                key={difficulty}
                 style={{
                   fontFamily: "'DM Mono',monospace",
                   fontSize: '11px',
@@ -1410,16 +1803,36 @@ export default function SetupScreen() {
                   animation: 'fadeUp 0.2s ease forwards',
                 }}
               >
-                {diffHint ?? selectedDiff?.hint}
+                {difficultyDescriptions[difficulty]}
               </div>
             </div>
 
             <div style={{ marginBottom: '28px', ...stagger(4) }}>
               <SectionLabel step="3">Question Type</SectionLabel>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
                 {CATEGORIES.map((c) => (
-                  <CategoryChip key={c.id} cat={c} selected={category === c.id} onClick={() => setCategory(c.id)} />
+                  <CategoryChip
+                    key={c.id}
+                    cat={c}
+                    selected={category === c.id}
+                    onClick={() => setCategory(c.id)}
+                    count={getCategoryCount(c.id)}
+                  />
                 ))}
+              </div>
+              <div
+                key={category}
+                style={{
+                  fontFamily: "'DM Mono',monospace",
+                  fontSize: '11px',
+                  color: '#4b5563',
+                  fontStyle: 'italic',
+                  paddingLeft: '2px',
+                  minHeight: '16px',
+                  animation: 'fadeUp 0.2s ease forwards',
+                }}
+              >
+                {CATEGORIES.find((c) => c.id === category)?.desc}
               </div>
             </div>
 
@@ -1478,6 +1891,67 @@ export default function SetupScreen() {
               )}
             </div>
 
+            {role && mode === 'generic' && (() => {
+              const mappedRole = toInterviewRole(role as UiRole);
+              // Custom role: preview from all roles
+              const roleFiltered =
+                role === 'custom'
+                  ? seededQuestions.filter((q) => q.difficulty === difficulty)
+                  : seededQuestions.filter((q) => q.role === mappedRole && q.difficulty === difficulty);
+              const matching = roleFiltered;
+              const categoryFiltered =
+                category === 'random'
+                  ? matching
+                  : matching.filter((q) => {
+                      const qcat = (q.category ?? '').toLowerCase();
+                      if (category === 'teamwork') return qcat.includes('team');
+                      if (category === 'leadership') return qcat.includes('leader') || qcat.includes('priorit');
+                      if (category === 'conflict') return qcat.includes('conflict') || qcat.includes('disagree');
+                      if (category === 'failure') return qcat.includes('mistake') || qcat.includes('fail');
+                      return true;
+                    });
+              const pool = categoryFiltered.length > 0 ? categoryFiltered : matching;
+              const previewQuestion = pool.length > 0 ? pool[Math.floor(pool.length / 2)] : null;
+              if (!previewQuestion) return null;
+              return (
+                <div
+                  key={`${role}-${difficulty}-${category}`}
+                  style={{
+                    marginBottom: '20px',
+                    padding: '14px 16px',
+                    background: 'rgba(255,255,255,0.018)',
+                    border: '1px solid rgba(255,255,255,0.07)',
+                    borderRadius: '12px',
+                    animation: 'fadeUp 0.22s ease forwards',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontFamily: "'DM Mono',monospace",
+                      fontSize: '10px',
+                      color: '#374151',
+                      letterSpacing: '0.09em',
+                      textTransform: 'uppercase',
+                      marginBottom: '8px',
+                    }}
+                  >
+                    Example question for this setup
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: "'DM Sans',sans-serif",
+                      fontSize: '13px',
+                      color: '#4b5563',
+                      fontStyle: 'italic',
+                      lineHeight: 1.55,
+                    }}
+                  >
+                    {previewQuestion.text}
+                  </div>
+                </div>
+              );
+            })()}
+
             <div
               style={{
                 height: '1px',
@@ -1486,7 +1960,131 @@ export default function SetupScreen() {
               }}
             />
 
-            <div style={{ ...stagger(6) }}>
+            {/* Voice selector */}
+            <div style={{ marginBottom: '12px', ...stagger(6) }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                <span
+                  style={{
+                    fontFamily: "'DM Mono',monospace",
+                    fontSize: '10px',
+                    fontWeight: '600',
+                    color: '#374151',
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Interviewer Voice
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {TTS_VOICES.map((v) => {
+                  const selected = state.ttsVoice === v.id;
+                  return (
+                    <button
+                      key={v.id}
+                      onClick={() => dispatch({ type: 'SET_TTS_VOICE', payload: v.id })}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '100px',
+                        border: `1px solid ${selected ? '#6366f1' : '#1c1c2a'}`,
+                        background: selected ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.02)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.18s ease',
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontFamily: "'DM Mono',monospace",
+                          fontSize: '11px',
+                          fontWeight: selected ? '600' : '400',
+                          color: selected ? '#a5b4fc' : '#6b7280',
+                          transition: 'color 0.18s',
+                        }}
+                      >
+                        {v.label}
+                      </span>
+                      <span
+                        style={{
+                          fontFamily: "'DM Mono',monospace",
+                          fontSize: '10px',
+                          color: selected ? '#818cf8' : '#374151',
+                          transition: 'color 0.18s',
+                        }}
+                      >
+                        {v.hint}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Speed selector */}
+            <div style={{ marginBottom: '20px', ...stagger(6) }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                <span
+                  style={{
+                    fontFamily: "'DM Mono',monospace",
+                    fontSize: '10px',
+                    fontWeight: '600',
+                    color: '#374151',
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Speaking Speed
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {TTS_SPEEDS.map((s) => {
+                  const selected = state.ttsSpeed === s.value;
+                  return (
+                    <button
+                      key={s.value}
+                      onClick={() => dispatch({ type: 'SET_TTS_SPEED', payload: s.value })}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '100px',
+                        border: `1px solid ${selected ? '#6366f1' : '#1c1c2a'}`,
+                        background: selected ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.02)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.18s ease',
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontFamily: "'DM Mono',monospace",
+                          fontSize: '11px',
+                          fontWeight: selected ? '600' : '400',
+                          color: selected ? '#a5b4fc' : '#6b7280',
+                          transition: 'color 0.18s',
+                        }}
+                      >
+                        {s.label}
+                      </span>
+                      <span
+                        style={{
+                          fontFamily: "'DM Mono',monospace",
+                          fontSize: '10px',
+                          color: selected ? '#818cf8' : '#374151',
+                          transition: 'color 0.18s',
+                        }}
+                      >
+                        {s.hint}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ ...stagger(7) }}>
               <button
                 className="start-btn"
                 onClick={handleStart}
@@ -1524,7 +2122,7 @@ export default function SetupScreen() {
                         animation: 'spin 0.65s linear infinite',
                       }}
                     />
-                    <span>Preparing your question…</span>
+                    <span>{mode === 'resume' ? 'Generating your question…' : 'Preparing your question…'}</span>
                   </>
                 ) : (
                   <>
@@ -1549,7 +2147,7 @@ export default function SetupScreen() {
             </div>
           </div>
 
-          <div style={{ ...stagger(7), display: 'flex', justifyContent: 'center', gap: '32px', marginTop: '28px' }}>
+          <div style={{ ...stagger(8), display: 'flex', justifyContent: 'center', gap: '32px', marginTop: '28px' }}>
             {[
               { val: 'STAR', label: 'framework' },
               { val: '< 30s', label: 'feedback' },

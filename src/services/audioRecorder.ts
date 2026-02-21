@@ -1,106 +1,130 @@
-export interface AudioPipelineConfig {
-  onSilenceStart: () => void;
-  onSilenceEnd: () => void;
-  onVolumeLevel: (rms: number) => void;
+/**
+ * Audio recording service using MediaRecorder.
+ *
+ * Voice Activity Detection (VAD) is handled separately by @ricky0123/vad-web
+ * in useAudioRecorder. This module only manages the MediaRecorder for capturing
+ * the full audio blob (sent to Whisper for transcription).
+ */
+
+export interface RecorderCallbacks {
+  onMicDisconnect: () => void;
+  onError: (error: Error) => void;
 }
 
-export interface AudioPipeline {
-  start: () => Promise<MediaStream>;
+export interface AudioRecorder {
+  start: (stream: MediaStream) => void;
   stop: () => Promise<Blob>;
+  isActive: () => boolean;
 }
 
-const SILENCE_THRESHOLD = 0.01;
-const SILENCE_DURATION_MS = 3000;
-const VOLUME_CHECK_INTERVAL_MS = 100;
+const STOP_TIMEOUT_MS = 5000;
 
-export function createAudioPipeline(config: AudioPipelineConfig): AudioPipeline {
-  let audioContext: AudioContext;
-  let mediaStream: MediaStream;
-  let mediaRecorder: MediaRecorder;
-  let analyserNode: AnalyserNode;
-  let sourceNode: MediaStreamAudioSourceNode;
+export function createAudioRecorder(callbacks: RecorderCallbacks): AudioRecorder {
+  let mediaRecorder: MediaRecorder | null = null;
+  let recorderMimeType = '';
   const chunks: Blob[] = [];
-  let silenceStartTime: number | null = null;
-  let isSilent = false;
-  let volumeCheckInterval: number;
+  let trackEndedHandler: (() => void) | null = null;
 
-  async function start(): Promise<MediaStream> {
-    mediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        channelCount: 1,
-      },
-    });
+  function getSupportedMimeType(): string {
+    if (!window.MediaRecorder?.isTypeSupported) return '';
+    const candidates = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4;codecs=mp4a.40.2',
+      'audio/mp4',
+    ];
+    return candidates.find((type) => window.MediaRecorder.isTypeSupported(type)) ?? '';
+  }
 
-    audioContext = new AudioContext();
-    sourceNode = audioContext.createMediaStreamSource(mediaStream);
+  function start(stream: MediaStream): void {
+    chunks.length = 0;
 
-    // AnalyserNode for RMS volume monitoring
-    analyserNode = audioContext.createAnalyser();
-    analyserNode.fftSize = 2048;
-    analyserNode.smoothingTimeConstant = 0.3;
-    sourceNode.connect(analyserNode);
+    const tracks = stream.getAudioTracks();
+    if (!tracks.length) {
+      callbacks.onError(new Error('Stream has no audio tracks'));
+      return;
+    }
 
-    // MediaRecorder for final blob
-    mediaRecorder = new MediaRecorder(mediaStream, {
-      mimeType: 'audio/webm;codecs=opus',
-    });
+    // Watch for mic disconnection
+    trackEndedHandler = () => {
+      console.warn('[Recorder] Audio track ended (mic disconnected?)');
+      callbacks.onMicDisconnect();
+    };
+    tracks[0].addEventListener('ended', trackEndedHandler);
+
+    recorderMimeType = getSupportedMimeType();
+    const options = recorderMimeType ? { mimeType: recorderMimeType } : undefined;
+
+    try {
+      mediaRecorder = new MediaRecorder(stream, options);
+    } catch (err) {
+      callbacks.onError(new Error(`MediaRecorder init failed: ${err}`));
+      return;
+    }
+
     mediaRecorder.ondataavailable = (e) => {
       if (e.data.size > 0) chunks.push(e.data);
     };
-    mediaRecorder.start(1000);
 
-    // Volume monitoring loop with silence detection
-    const dataArray = new Float32Array(analyserNode.fftSize);
-    volumeCheckInterval = window.setInterval(() => {
-      analyserNode.getFloatTimeDomainData(dataArray);
+    mediaRecorder.onerror = (event) => {
+      console.error('[Recorder] MediaRecorder error:', event);
+      callbacks.onError(new Error('MediaRecorder error during recording'));
+    };
 
-      let sum = 0;
-      for (let i = 0; i < dataArray.length; i++) {
-        sum += dataArray[i] * dataArray[i];
-      }
-      const rms = Math.sqrt(sum / dataArray.length);
-      config.onVolumeLevel(rms);
-
-      if (rms < SILENCE_THRESHOLD) {
-        if (!silenceStartTime) {
-          silenceStartTime = Date.now();
-        } else if (Date.now() - silenceStartTime >= SILENCE_DURATION_MS && !isSilent) {
-          isSilent = true;
-          config.onSilenceStart();
-        }
-      } else {
-        if (isSilent) {
-          config.onSilenceEnd();
-        }
-        silenceStartTime = null;
-        isSilent = false;
-      }
-    }, VOLUME_CHECK_INTERVAL_MS);
-
-    return mediaStream;
+    try {
+      mediaRecorder.start(1000);
+      console.log('[Recorder] Started, mimeType:', recorderMimeType || 'browser default');
+    } catch (err) {
+      callbacks.onError(new Error(`MediaRecorder.start() failed: ${err}`));
+      mediaRecorder = null;
+    }
   }
 
   function stop(): Promise<Blob> {
-    clearInterval(volumeCheckInterval);
-    analyserNode?.disconnect();
-    sourceNode?.disconnect();
-    mediaStream?.getTracks().forEach((t) => t.stop());
+    const outputType = recorderMimeType || mediaRecorder?.mimeType || 'audio/webm';
 
-    return new Promise((resolve) => {
+    // Clean up track listener
+    if (trackEndedHandler && mediaRecorder) {
+      try {
+        const stream = mediaRecorder.stream;
+        stream.getAudioTracks().forEach((t) => {
+          t.removeEventListener('ended', trackEndedHandler!);
+        });
+      } catch { /* stream may already be dead */ }
+      trackEndedHandler = null;
+    }
+
+    return new Promise<Blob>((resolve) => {
       if (!mediaRecorder || mediaRecorder.state === 'inactive') {
-        audioContext?.close();
-        resolve(new Blob(chunks, { type: 'audio/webm;codecs=opus' }));
+        resolve(new Blob(chunks, { type: outputType }));
         return;
       }
+
+      // Timeout guard — don't hang forever if MediaRecorder misbehaves
+      const timeout = setTimeout(() => {
+        console.warn('[Recorder] stop() timed out, resolving with partial data');
+        resolve(new Blob(chunks, { type: outputType }));
+      }, STOP_TIMEOUT_MS);
+
       mediaRecorder.onstop = () => {
-        audioContext?.close();
-        resolve(new Blob(chunks, { type: 'audio/webm;codecs=opus' }));
+        clearTimeout(timeout);
+        resolve(new Blob(chunks, { type: outputType }));
       };
-      mediaRecorder.stop();
+
+      try {
+        mediaRecorder.stop();
+      } catch {
+        clearTimeout(timeout);
+        resolve(new Blob(chunks, { type: outputType }));
+      }
+
+      mediaRecorder = null;
     });
   }
 
-  return { start, stop };
+  function isActive(): boolean {
+    return mediaRecorder?.state === 'recording';
+  }
+
+  return { start, stop, isActive };
 }
