@@ -1,12 +1,15 @@
+// InterviewScreen.tsx
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInterview } from '../context/InterviewContext';
-import WaveformVisualizer from '../components/WaveformVisualizer';
+import ParticleVisualizer from '../components/ParticleVisualizer';
 import microphoneOnIcon from '../icons/microphoneOn.png';
 import microphoneOffIcon from '../icons/microphoneOff.png';
 import cameraOnIcon from '../icons/cameraOn.png';
 import cameraOffIcon from '../icons/cameraOff.png';
 import starlyIcon from '../icons/StarlyLogo.png';
+import starlyWordmark from '../icons/STARLY.png';
+import settingsIcon from '../icons/Settings.png';
 
 export default function InterviewScreen() {
   const { state } = useInterview();
@@ -19,9 +22,12 @@ export default function InterviewScreen() {
   const [cameraEnabled, setCameraEnabled] = useState(true);
   const [micEnabled, setMicEnabled] = useState(true);
   const [answerSeconds, setAnswerSeconds] = useState(0);
+  const [particleEnergy, setParticleEnergy] = useState(0);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const lastEnergyUpdateRef = useRef(0);
+  const answerStartTimeRef = useRef<number>(Date.now());
 
   const handleDone = () => {
-    // TODO: Stop recording, send to Whisper, score, then navigate
     navigate('/feedback');
   };
 
@@ -30,9 +36,21 @@ export default function InterviewScreen() {
       setCameraStatus('unsupported');
       return;
     }
+
     if (streamRef.current) {
-      setCameraStatus('ready');
-      return;
+      const tracks = streamRef.current.getVideoTracks();
+      const isLive = tracks.length > 0 && tracks[0].readyState === 'live';
+      if (isLive) {
+        if (videoRef.current && videoRef.current.srcObject !== streamRef.current) {
+          videoRef.current.srcObject = streamRef.current;
+          videoRef.current.play().catch(() => {});
+        }
+        setCameraStatus('ready');
+        return;
+      } else {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
     }
 
     setCameraStatus('loading');
@@ -55,7 +73,7 @@ export default function InterviewScreen() {
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+        videoRef.current.play().catch(() => {});
       }
 
       setCameraStatus('ready');
@@ -67,6 +85,15 @@ export default function InterviewScreen() {
   }, []);
 
   useEffect(() => {
+    if (cameraStatus === 'ready' && streamRef.current && videoRef.current) {
+      if (videoRef.current.srcObject !== streamRef.current) {
+        videoRef.current.srcObject = streamRef.current;
+        videoRef.current.play().catch(() => {});
+      }
+    }
+  }, [cameraStatus]);
+
+  useEffect(() => {
     void requestCamera();
     return () => {
       if (streamRef.current) {
@@ -74,6 +101,7 @@ export default function InterviewScreen() {
         streamRef.current = null;
       }
       if (videoRef.current) {
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         videoRef.current.srcObject = null;
       }
     };
@@ -87,12 +115,14 @@ export default function InterviewScreen() {
   }, [cameraEnabled]);
 
   useEffect(() => {
-    if (!micEnabled) return;
-    const id = window.setInterval(() => {
-      setAnswerSeconds((seconds) => seconds + 1);
-    }, 1000);
+    const tick = () => {
+      const elapsed = Math.floor((Date.now() - answerStartTimeRef.current) / 1000);
+      setAnswerSeconds(elapsed);
+    };
+    tick();
+    const id = window.setInterval(tick, 250);
     return () => window.clearInterval(id);
-  }, [micEnabled]);
+  }, []);
 
   const answerTimeLabel = useMemo(() => {
     const mins = Math.floor(answerSeconds / 60);
@@ -100,20 +130,27 @@ export default function InterviewScreen() {
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   }, [answerSeconds]);
 
-  const demoTranscript = `
-Interviewer: Tell me about a time you solved a complex problem under pressure.
-Candidate: In my previous role, our release pipeline failed on launch day and blocked customer updates. I took ownership of triage, split the incident into build, test, and deploy tracks, and coordinated with engineering and QA in 15-minute checkpoints.
-Candidate: I identified that a dependency version mismatch was causing non-deterministic test failures. I pinned versions, updated lockfiles, and added a validation step in CI so we could catch drift earlier.
-Candidate: While the fix was rolling out, I communicated status every 20 minutes to stakeholders and documented risk with clear go/no-go criteria.
-Candidate: We restored the pipeline in under two hours, shipped the release the same day, and reduced similar failures by about 60% over the next quarter.
-Interviewer: What did you learn from that experience?
-Candidate: I learned that speed comes from structure, not rushing. When I define owners, timelines, and fallback paths early, the team can move faster with less confusion.
-Candidate: I also learned to pair technical debugging with communication discipline. Stakeholders stay aligned when updates are concise, timestamped, and action-focused.
-Interviewer: How do you apply that learning today?
-Candidate: I now run pre-release checklists, automate dependency checks, and rehearse rollback procedures. That preparation has made launches smoother and reduced emergency fixes.
-Candidate: Another example was a customer analytics dashboard migration where I rewrote critical queries, improved load time from 9 seconds to 2.3 seconds, and created monitoring alerts for latency spikes.
-Candidate: Across projects, I focus on measurable outcomes, clear ownership, and postmortems that produce concrete process changes.
-`.trim();
+  const normalizedEnergy = useMemo(() => Math.min(1, Math.max(0, particleEnergy * 2.4)), [particleEnergy]);
+
+  useEffect(() => {
+    if (!micEnabled) {
+      setIsSpeaking(false);
+      return;
+    }
+    setIsSpeaking((prev) => {
+      if (prev) return normalizedEnergy > 0.1;
+      return normalizedEnergy > 0.2;
+    });
+  }, [micEnabled, normalizedEnergy]);
+
+  const activeEnergy = isSpeaking ? normalizedEnergy : 0;
+
+  const handleParticleEnergy = useCallback((energy: number) => {
+    const now = performance.now();
+    if (now - lastEnergyUpdateRef.current < 70) return;
+    lastEnergyUpdateRef.current = now;
+    setParticleEnergy(energy);
+  }, []);
 
   useEffect(() => {
     if (!transcriptBodyRef.current) return;
@@ -172,6 +209,16 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
           @keyframes floatBlobB {
             0%, 100% { transform: translateY(0px) rotate(0deg); }
             50% { transform: translateY(12px) rotate(-10deg); }
+          }
+
+          /* IMPORTANT: keep translate(-50%, -50%) in keyframes so pausing freezes correctly */
+          @keyframes starlyFlow {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+          }
+          @keyframes starlyGlow {
+            0%, 100% { filter: invert(1) brightness(1.25) drop-shadow(0 0 12px rgba(255, 255, 255, 0.4)) drop-shadow(0 0 26px rgba(180, 210, 255, 0.25)); }
+            50% { filter: invert(1) brightness(1.45) drop-shadow(0 0 15px rgba(255, 255, 255, 0.62)) drop-shadow(0 0 36px rgba(190, 220, 255, 0.42)); }
           }
         `}
       </style>
@@ -233,9 +280,9 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
             justifySelf: 'center',
             fontSize: '1.08rem',
             fontWeight: 700,
-            color: '#041018',
+            color: '#ffffff',
             fontFamily: "'Unbounded', 'Space Grotesk', sans-serif",
-            background: 'linear-gradient(135deg, #f3f3f3 5%, #dcdcdc 52%, #b8b8b8 100%)',
+            background: '#141414',
             border: '1px solid rgba(255, 255, 255, 0.45)',
             borderRadius: '14px',
             padding: '0.52rem 1rem',
@@ -246,20 +293,30 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
           {answerTimeLabel}
         </div>
 
-        <div style={{ justifySelf: 'end', display: 'flex', gap: '0.6rem' }}>
+        <div style={{ justifySelf: 'end', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
           <button
             type="button"
             style={{
-              padding: '0.55rem 0.95rem',
-              borderRadius: '12px',
-              border: '1px solid rgba(255, 255, 255, 0.28)',
-              background: 'linear-gradient(145deg, rgba(8, 18, 34, 0.92), rgba(9, 20, 37, 0.8))',
-              color: '#f1f1f1',
-              fontSize: '0.9rem',
-              letterSpacing: '0.06em',
+              width: 'auto',
+              height: 'auto',
+              marginRight: '0.2rem',
+              padding: 0,
+              border: 'none',
+              background: 'transparent',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transform: 'translateX(30px)',
             }}
+            aria-label="Settings"
+            title="Settings"
           >
-            Settings
+            <img
+              src={settingsIcon}
+              alt="Settings"
+              style={{ width: '100px', height: '100px', objectFit: 'contain', display: 'block' }}
+            />
           </button>
           <button
             type="button"
@@ -267,16 +324,16 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
             style={{
               padding: '0.55rem 0.95rem',
               borderRadius: '12px',
-              border: '1px solid rgba(255, 255, 255, 0.45)',
-              background: 'linear-gradient(130deg, #ffffff, #dcdcdc 45%, #bdbdbd)',
-              color: '#111111',
+              border: '1px solid rgba(255, 120, 120, 0.65)',
+              background: 'linear-gradient(135deg, #8f1010 0%, #b31313 50%, #cf1f1f 100%)',
+              color: '#ffffff',
               fontSize: '0.9rem',
               fontWeight: 700,
               letterSpacing: '0.08em',
-              boxShadow: '0 0 18px rgba(255, 255, 255, 0.22)',
+              boxShadow: '0 0 18px rgba(207, 31, 31, 0.35)',
             }}
           >
-            End
+            End Interview
           </button>
         </div>
       </header>
@@ -296,6 +353,7 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
           overflow: 'hidden',
         }}
       >
+        {/* Left: Video */}
         <section
           style={{
             minHeight: 0,
@@ -345,9 +403,9 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
                 <strong>Your Video</strong>
                 <p style={{ marginTop: '0.5rem', color: '#d0d0d0' }}>
                   {!cameraEnabled && 'Camera is off.'}
-                  {cameraStatus === 'loading' && 'Requesting camera access...'}
-                  {cameraStatus === 'unsupported' && 'Camera is not supported in this browser.'}
-                  {cameraStatus === 'error' && `Camera unavailable: ${cameraError}`}
+                  {cameraEnabled && cameraStatus === 'loading' && 'Requesting camera access...'}
+                  {cameraEnabled && cameraStatus === 'unsupported' && 'Camera is not supported in this browser.'}
+                  {cameraEnabled && cameraStatus === 'error' && `Camera unavailable: ${cameraError}`}
                 </p>
                 {(cameraStatus === 'error' || cameraStatus === 'unsupported') && cameraEnabled && (
                   <button
@@ -394,6 +452,7 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                opacity: micEnabled ? 0.92 : 0.55,
               }}
               aria-label={micEnabled ? 'Turn microphone off' : 'Turn microphone on'}
               title={micEnabled ? 'Turn microphone off' : 'Turn microphone on'}
@@ -401,11 +460,7 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
               <img
                 src={micEnabled ? microphoneOnIcon : microphoneOffIcon}
                 alt={micEnabled ? 'Microphone on' : 'Microphone off'}
-                style={{
-                  width: '20px',
-                  height: '20px',
-                  objectFit: 'contain',
-                }}
+                style={{ width: '40px', height: '40px', objectFit: 'contain' }}
               />
             </button>
             <button
@@ -413,8 +468,12 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
               onClick={() => {
                 const next = !cameraEnabled;
                 setCameraEnabled(next);
-                if (next && !streamRef.current) {
-                  void requestCamera();
+                if (next) {
+                  const tracks = streamRef.current?.getVideoTracks() ?? [];
+                  const isLive = tracks.length > 0 && tracks[0].readyState === 'live';
+                  if (!isLive) {
+                    void requestCamera();
+                  }
                 }
               }}
               style={{
@@ -428,6 +487,7 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                opacity: cameraEnabled ? 0.92 : 0.55,
               }}
               aria-label={cameraEnabled ? 'Turn camera off' : 'Turn camera on'}
               title={cameraEnabled ? 'Turn camera off' : 'Turn camera on'}
@@ -435,41 +495,71 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
               <img
                 src={cameraEnabled ? cameraOnIcon : cameraOffIcon}
                 alt={cameraEnabled ? 'Camera on' : 'Camera off'}
-                style={{
-                  width: '20px',
-                  height: '20px',
-                  objectFit: 'contain',
-                }}
+                style={{ width: '40px', height: '40px', objectFit: 'contain' }}
               />
             </button>
           </div>
         </section>
 
+        {/* Right: Particle Visualizer + Wordmark */}
         <section
           style={{
             minHeight: 0,
             height: '100%',
             boxSizing: 'border-box',
-            border: '1px solid rgba(255, 255, 255, 0.14)',
-            borderRadius: '10px 22px 10px 22px',
+            borderTop: 'none',
+            borderBottom: 'none',
+            borderLeft: '1px solid rgba(255, 255, 255, 0.14)',
+            borderRight: '1px solid rgba(255, 255, 255, 0.14)',
+            borderRadius: '0',
             background: 'linear-gradient(160deg, rgba(12, 22, 34, 0.95), rgba(8, 16, 27, 0.98))',
-            color: '#f0f0f0',
-            padding: '1.15rem',
+            padding: '0',
             display: 'flex',
-            flexDirection: 'column',
-            gap: '0.95rem',
-            alignItems: 'center',
-            justifyContent: 'center',
             overflow: 'hidden',
             boxShadow: 'inset 0 0 26px rgba(255, 255, 255, 0.05), 0 10px 24px rgba(0, 0, 0, 0.35)',
           }}
         >
-          <div style={{ width: 'calc(100% + 2.3rem)', marginLeft: '-1.15rem', marginRight: '-1.15rem' }}>
-            <WaveformVisualizer height={285} micEnabled={micEnabled} />
+          <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+            <ParticleVisualizer
+              micEnabled={micEnabled}
+              isSpeaking={isSpeaking}
+              audioCaptureEnabled={cameraStatus === 'ready'}
+              onEnergyChange={handleParticleEnergy}
+            />
+
+            <img
+              src={starlyWordmark}
+              alt="STARLY"
+              style={{
+                position: 'absolute',
+                left: '50%',
+                top: '50%',
+                zIndex: 5,
+                width: '100px',
+                height: 'auto',
+                objectFit: 'contain',
+                pointerEvents: 'none',
+                opacity: micEnabled ? 0.54 + activeEnergy * 0.2 : 0.5,
+                filter: `invert(1) brightness(${(1.2 + activeEnergy * 0.36).toFixed(
+                  3
+                )}) drop-shadow(0 0 ${Math.round(8 + activeEnergy * 12)}px rgba(255, 255, 255, 0.52)) drop-shadow(0 0 ${Math.round(20 + activeEnergy * 30)}px rgba(180, 210, 255, 0.34))`,
+                mixBlendMode: 'screen',
+                transformOrigin: '50% 50%',
+                backfaceVisibility: 'hidden',
+                willChange: 'transform, filter, opacity',
+                transition: 'opacity 160ms linear, filter 180ms linear',
+
+                // FIX #1: keep animation defined always; pause instead of removing => freezes at last frame (no snap-back)
+                animation: 'starlyFlow 7.2s linear infinite, starlyGlow 1.8s ease-in-out infinite',
+                animationPlayState: isSpeaking ? 'running' : 'paused',
+                animationFillMode: 'both',
+              }}
+            />
           </div>
         </section>
       </div>
 
+      {/* Transcript */}
       <section
         style={{
           position: 'relative',
@@ -491,7 +581,7 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
           style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
+            justifyContent: 'flex-start',
             padding: '0.18rem 0.7rem 0.35rem',
             marginBottom: '0.7rem',
           }}
@@ -500,7 +590,7 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
             style={{
               fontFamily: "'Unbounded', 'Space Grotesk', sans-serif",
               fontSize: '0.85rem',
-              textAlign: 'center',
+              textAlign: 'left',
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
               color: '#ececec',
@@ -519,9 +609,7 @@ Candidate: Across projects, I focus on measurable outcomes, clear ownership, and
             paddingRight: '0.2rem',
           }}
         >
-          <p style={{ marginTop: 0, lineHeight: 1.54, color: '#d7d7d7' }}>
-            {state.liveTranscript || demoTranscript}
-          </p>
+          <p style={{ marginTop: 0, lineHeight: 1.54, color: '#d7d7d7' }}>{state.liveTranscript}</p>
         </div>
       </section>
     </div>
