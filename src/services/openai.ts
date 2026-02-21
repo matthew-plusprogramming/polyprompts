@@ -100,17 +100,6 @@ Return "ask" for EVERYTHING else. When in doubt, always return "ask". The interv
   return 'ask';
 }
 
-// --- Whisper Transcription ---
-export async function transcribeAudio(audioBlob: Blob): Promise<string> {
-  const openai = await getClient();
-  const file = new File([audioBlob], 'recording.webm', { type: audioBlob.type });
-  const transcription = await openai.audio.transcriptions.create({
-    model: 'whisper-1',
-    file: file,
-  });
-  return transcription.text;
-}
-
 // --- Scoring ---
 const SCORING_SYSTEM_PROMPT = `You are an expert interview coach specializing in behavioral interviews. Your job is to evaluate a candidate's answer using the STAR framework and return structured JSON feedback.
 

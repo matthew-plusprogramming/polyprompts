@@ -238,6 +238,7 @@ export function useAudioRecorder(options: UseAudioRecorderOptions) {
       setVadReady(true);
       setIsRecording(true);
       console.log('[useAudioRecorder] VAD + MediaRecorder + volume monitor started');
+      return micStreamRef.current;
     } catch (err) {
       console.error('[useAudioRecorder] VAD initialization failed:', err);
       setIsRecording(false);

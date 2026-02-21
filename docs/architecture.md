@@ -26,7 +26,7 @@
 3. **User Responds** - Microphone activates; user speaks their answer while seeing a live transcript and waveform
 4. **Silence Detection** - If 4s of silence, system asks "Are you finished?" via TTS nudge
 5. **Submit** - User clicks Done (or presses Space); recording stops
-6. **Processing** - Audio transcribed (Whisper), answer scored against STAR framework
+6. **Processing** - Deepgram streaming transcript finalized, answer scored against STAR framework
 7. **Feedback** - Radar chart of 6 dimensions, suggestions, follow-up coaching question
 8. **Loop** - User can retry the same question or move to a new one
 
@@ -57,8 +57,7 @@
 
 | Service | Provider | Model/API | Purpose | Called From |
 |---------|----------|-----------|---------|------------|
-| **Live STT** | Browser | Web Speech API | Real-time transcript during speaking | `useSpeechRecognition.ts` |
-| **Authoritative STT** | OpenAI | `whisper-1` | Accurate post-recording transcript | `openai.ts → transcribeAudio()` |
+| **Streaming STT** | Deepgram | `nova-2` (WebSocket) | Real-time transcript with filler word detection | `useDeepgramTranscription.ts` via `api/key.js` |
 | **Text-to-Speech** | OpenAI | `tts-1` (alloy/nova/etc) | Read questions & nudges aloud | `openai.ts → textToSpeech()` |
 | **TTS Fallback** | Browser | SpeechSynthesis API | Fallback if OpenAI TTS fails | `useTTS.ts` |
 | **STAR Scoring** | OpenAI | `gpt-4o-mini` | Score answer on 6 STAR dimensions | `openai.ts → scoreAnswer()` |
@@ -72,29 +71,32 @@
 ```
 Microphone (getUserMedia)
     |
-    +---> Web Speech API ------------> Live transcript (displayed in UI)
-    |        (continuous, interim)
+    +---> Deepgram WebSocket ---------> Real-time transcript (displayed in UI)
+    |        (nova-2, 16kHz Int16 PCM)     (final + interim results, filler words)
+    |        via AudioContext +
+    |        ScriptProcessor
     |
     +---> VAD (ricky0123/vad-web) ---> Detects speech start/stop
-    |        (ONNX neural net)              |
-    |                                       v
-    +---> MediaRecorder ----------------> Audio Blob
-    |        (webm/opus or mp4)              |
-    |                                        v
+    |        (ONNX neural net)
+    |
+    +---> MediaRecorder ----------------> Audio Blob (kept for potential replay)
+    |        (webm/opus or mp4)
+    |
     +---> AudioContext + AnalyserNode --> WaveformVisualizer (canvas)
-             (also: DynamicsCompressor       |
-              for normalization)             v
+             (also: DynamicsCompressor
+              for normalization)
+
                                      On submit/done:
                                         |
                                         v
-                                  OpenAI Whisper -----> Final transcript
-                                   (whisper-1)              |
-                                        |                   v
-                                        |            OpenAI gpt-4o-mini
-                                        |            (STAR scoring)
-                                        |                   |
-                                        v                   v
-                                  FeedbackScreen <--- ScoringResult
+                                  Deepgram transcript ---> Final transcript
+                                   (already accumulated)        |
+                                                                v
+                                                         OpenAI gpt-4o-mini
+                                                         (STAR scoring)
+                                                                |
+                                                                v
+                                                   FeedbackScreen <--- ScoringResult
 ```
 
 ### Screens & Routes
@@ -109,7 +111,7 @@ Microphone (getUserMedia)
 
 | Hook | File | Purpose |
 |------|------|---------|
-| `useSpeechRecognition` | `src/hooks/useSpeechRecognition.ts` | Web Speech API wrapper (auto-restart, interim results) |
+| `useDeepgramTranscription` | `src/hooks/useDeepgramTranscription.ts` | Deepgram WebSocket streaming (real-time, filler words) |
 | `useAudioRecorder` | `src/hooks/useAudioRecorder.ts` | VAD + MediaRecorder + silence detection |
 | `useTTS` | `src/hooks/useTTS.ts` | OpenAI TTS playback + native fallback |
 | `useFillerDetection` | `src/hooks/useFillerDetection.ts` | Count filler words (um, uh, like, etc.) |
@@ -118,7 +120,8 @@ Microphone (getUserMedia)
 
 | Service | File | Purpose |
 |---------|------|---------|
-| OpenAI | `src/services/openai.ts` | All OpenAI calls (TTS, Whisper, scoring, pause analysis, question gen) |
+| OpenAI | `src/services/openai.ts` | OpenAI calls (TTS, scoring, pause analysis, question gen) |
+| Deepgram Key | `api/key.js` | Vercel serverless endpoint — exchanges env key for 60s temp key |
 | AudioRecorder | `src/services/audioRecorder.ts` | MediaRecorder lifecycle |
 | Supabase | `src/services/supabase.ts` | Placeholder (not implemented) |
 
@@ -161,6 +164,7 @@ Microphone (getUserMedia)
 
 ```
 VITE_OPENAI_API_KEY    — OpenAI API key (currently exposed in browser!)
+DEEPGRAM_API_KEY       — Deepgram API key (server-side only, used by api/key.js)
 VITE_SUPABASE_URL      — Supabase project URL (not yet used)
 VITE_SUPABASE_ANON_KEY — Supabase anon key (not yet used)
 ```

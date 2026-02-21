@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInterview } from '../context/InterviewContext';
 import { useTTS } from '../hooks/useTTS';
-import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
+import { useDeepgramTranscription } from '../hooks/useDeepgramTranscription';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
-import { analyzePause, scoreAnswer, transcribeAudio, textToSpeech } from '../services/openai';
+import { analyzePause, scoreAnswer, textToSpeech } from '../services/openai';
 import { seededQuestions } from '../data/questions';
 import { countFillers } from '../hooks/useFillerDetection';
 import WaveformVisualizer from '../components/WaveformVisualizer';
@@ -28,7 +28,7 @@ export default function InterviewScreen() {
   const { state, dispatch } = useInterview();
   const navigate = useNavigate();
   const { speak, stopPlayback } = useTTS();
-  const speech = useSpeechRecognition();
+  const deepgram = useDeepgramTranscription();
 
   // ─── Main's camera state ───
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -160,7 +160,7 @@ export default function InterviewScreen() {
     if (!activeRef.current || analyzingRef.current) return;
     analyzingRef.current = true;
 
-    const transcript = speech.getFullTranscript();
+    const transcript = deepgram.getFullTranscript();
 
     if (!transcript || transcript.trim().length < 10) {
       analyzingRef.current = false;
@@ -202,7 +202,7 @@ export default function InterviewScreen() {
     }
 
     analyzingRef.current = false;
-  }, [speech]);
+  }, [deepgram]);
 
   const handleSilenceEnd = useCallback(() => {
     if (!analyzingRef.current && activeRef.current) {
@@ -215,10 +215,10 @@ export default function InterviewScreen() {
   const handleMicDisconnect = useCallback(() => {
     activeRef.current = false;
     clearSilenceTimer();
-    speech.stop();
+    deepgram.stop();
     setPhase('mic-error');
     setStatusText('Microphone disconnected. Please reconnect and try again.');
-  }, [clearSilenceTimer, speech]);
+  }, [clearSilenceTimer, deepgram]);
 
   // ─── Matthew's audio recorder hook ───
   const {
@@ -275,8 +275,9 @@ export default function InterviewScreen() {
     waitCountRef.current = 0;
     dispatch({ type: 'START_RECORDING' });
 
+    let micStream: MediaStream | null = null;
     try {
-      await startRecording(undefined, audioCtx);
+      micStream = await startRecording(undefined, audioCtx);
       recordingStartRef.current = Date.now();
     } catch (e) {
       console.error('[Interview] Recording failed:', e);
@@ -288,10 +289,12 @@ export default function InterviewScreen() {
       return;
     }
 
-    try {
-      speech.start();
-    } catch (e) {
-      console.error('[Interview] Speech recognition failed:', e);
+    if (micStream) {
+      try {
+        await deepgram.start(micStream);
+      } catch (e) {
+        console.error('[Interview] Deepgram transcription failed:', e);
+      }
     }
   };
 
@@ -299,7 +302,7 @@ export default function InterviewScreen() {
   const handleDone = useCallback(async () => {
     if (finishingRef.current) return;
 
-    const earlyTranscript = speech.getFullTranscript();
+    const earlyTranscript = deepgram.getFullTranscript();
     const wordCount = earlyTranscript.trim().split(/\s+/).filter(Boolean).length;
     if (wordCount < 10) {
       setShortAnswerWarning(
@@ -312,7 +315,7 @@ export default function InterviewScreen() {
     activeRef.current = false;
     clearSilenceTimer();
     stopPlayback();
-    speech.stop();
+    deepgram.stop();
     setPhase('finished');
 
     const totalDuration = Math.floor((Date.now() - recordingStartRef.current) / 1000);
@@ -324,19 +327,7 @@ export default function InterviewScreen() {
         dispatch({ type: 'STOP_RECORDING', payload: blob });
       }
 
-      let transcript = speech.getFullTranscript();
-
-      // Try Whisper for authoritative transcript
-      if (blob && blob.size > 0) {
-        try {
-          const whisperTranscript = await transcribeAudio(blob);
-          if (whisperTranscript && whisperTranscript.trim().length > 0) {
-            transcript = whisperTranscript;
-          }
-        } catch (err) {
-          console.warn('[Interview] Whisper transcription failed, using Web Speech API transcript:', err);
-        }
-      }
+      const transcript = deepgram.getFullTranscript();
 
       if (transcript) {
         dispatch({ type: 'UPDATE_TRANSCRIPT', payload: transcript });
@@ -381,7 +372,7 @@ export default function InterviewScreen() {
     } finally {
       finishingRef.current = false;
     }
-  }, [clearSilenceTimer, dispatch, navigate, speech, state.currentQuestion, state.previousAttempts.length, state.resumeData, state.role, state.difficulty, state.speakingDurationSeconds, stopPlayback, stopRecording]);
+  }, [clearSilenceTimer, dispatch, navigate, deepgram, state.currentQuestion, state.previousAttempts.length, state.resumeData, state.role, state.difficulty, state.speakingDurationSeconds, stopPlayback, stopRecording]);
 
   useEffect(() => {
     handleDoneRef.current = handleDone;
@@ -423,10 +414,10 @@ export default function InterviewScreen() {
 
   // Keep context transcript in sync
   useEffect(() => {
-    if (phase === 'recording' && speech.transcript) {
-      dispatch({ type: 'UPDATE_TRANSCRIPT', payload: speech.transcript });
+    if (phase === 'recording' && deepgram.transcript) {
+      dispatch({ type: 'UPDATE_TRANSCRIPT', payload: deepgram.transcript });
     }
-  }, [speech.transcript, phase, dispatch]);
+  }, [deepgram.transcript, phase, dispatch]);
 
   // Compute and dispatch WPM + filler metrics
   useEffect(() => {
@@ -446,22 +437,22 @@ export default function InterviewScreen() {
   }, [state.liveTranscript, state.isRecording, dispatch]);
 
   // Cleanup on unmount
-  const speechStop = speech.stop;
+  const deepgramStop = deepgram.stop;
   useEffect(() => {
     return () => {
       activeRef.current = false;
       clearSilenceTimer();
       stopPlayback();
-      speechStop();
+      deepgramStop();
       void stopRecording();
     };
-  }, [clearSilenceTimer, stopPlayback, stopRecording, speechStop]);
+  }, [clearSilenceTimer, stopPlayback, stopRecording, deepgramStop]);
 
   // Auto-scroll transcript
   useEffect(() => {
     if (!transcriptBodyRef.current) return;
     transcriptBodyRef.current.scrollTop = transcriptBodyRef.current.scrollHeight;
-  }, [state.liveTranscript, speech.transcript]);
+  }, [state.liveTranscript, deepgram.transcript]);
 
   // ─── Derived values ───
   const answerTimeLabel = useMemo(() => {
@@ -1135,7 +1126,7 @@ export default function InterviewScreen() {
             </button>
             <button
               onClick={() => {
-                const transcript = speech.getFullTranscript().trim();
+                const transcript = deepgram.getFullTranscript().trim();
                 if (transcript.length > 10) {
                   void handleDone();
                 } else {
@@ -1153,7 +1144,7 @@ export default function InterviewScreen() {
                 cursor: 'pointer',
               }}
             >
-              {speech.getFullTranscript().trim().length > 10 ? 'Score Current Answer' : 'Back to Setup'}
+              {deepgram.getFullTranscript().trim().length > 10 ? 'Score Current Answer' : 'Back to Setup'}
             </button>
           </div>
         </div>
@@ -1247,7 +1238,7 @@ export default function InterviewScreen() {
           }}
         >
           <p style={{ marginTop: 0, lineHeight: 1.54, color: '#d7d7d7' }}>
-            {state.liveTranscript || speech.transcript || (
+            {state.liveTranscript || deepgram.transcript || (
               phase === 'ready'
                 ? 'Click "Start" to begin the interview. Your transcript will appear here as you speak.'
                 : phase === 'speaking-question' || phase === 'thinking'
