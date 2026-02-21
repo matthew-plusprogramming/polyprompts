@@ -24,7 +24,11 @@ a:hover {
 
 body {
   margin: 0;
+<<<<<<< HEAD
   width: 100%;
+=======
+  place-items: center;
+>>>>>>> 354073af7a13f0b961ac71233fd03e846d70e3d9
   min-width: 320px;
   min-height: 100vh;
 }
