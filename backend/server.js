@@ -191,8 +191,43 @@ res.json(feedback);
   }
 
 });
-const PORT = 3001;
+// ------------------- /api/factcheck -------------------
+app.post("/api/factcheck", async (req, res) => {
+  try {
+    const { question, answer, correction } = req.body;
 
+    const factCheckPrompt = `
+You are a strict fact-checking AI for technical interview answers.
+Question: ${question}
+Candidate Answer: ${answer}
+User Correction: ${correction}
+
+Respond in JSON ONLY:
+{
+  "is_correct": true|false,
+  "result": "The correction is accurate." | "The correction is not accurate.",
+  "explanation": "Explain in 2-3 sentences why the correction is valid or invalid."
+}
+`;
+
+    const response = await openai.responses.create({
+      model: "gpt-4o-mini",
+      input: factCheckPrompt
+    });
+
+    let cleaned = response.output_text.replace(/^```json\s*/, "").replace(/```$/, "").trim();
+    const factCheckResult = JSON.parse(cleaned);
+
+    res.json(factCheckResult);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Fact-check failed" });
+  }
+});
+
+// ------------------- Start server -------------------
+const PORT = 3001;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
