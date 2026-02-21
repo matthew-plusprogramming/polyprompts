@@ -48,6 +48,15 @@ export async function textToSpeech(text: string, voice: string = 'alloy', speed:
   return blob;
 }
 
+// --- TTS Prefetch ---
+export function prefetchTTS(texts: string[], voice: string = 'alloy', speed: number = 1.0): void {
+  for (const text of texts) {
+    textToSpeech(text, voice, speed).catch((err) => {
+      log.warn('TTS prefetch failed', { text: text.slice(0, 40), error: String(err) });
+    });
+  }
+}
+
 // --- Pause Analysis ---
 // Returns:
 //   'definitely_done'          — auto-submit the answer (extremely high confidence)
