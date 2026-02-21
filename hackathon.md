@@ -1,0 +1,3 @@
+Poly Prompt is a 48-hour student hackathon (Feb 20–22) in Engineering 4 Room 106 focused on building a real, working AI-powered product for student/college life. The purpose is less “AI hype” and more “execution bootcamp”: use AI to move faster, think clearer, and ship cleaner, then tell a tight 5-minute story about what you built, who it helps, and why it matters.
+
+Your team is squarely in the Studying track: tools that actually help students learn better, not just generate fluff. That means focusing on concrete student pain points around classes—overwhelm, confusing material, bad study habits—and using AI in a meaningful way (e.g., turning real course materials into targeted practice, explanations, or feedback) while being honest about limits and ethics.
