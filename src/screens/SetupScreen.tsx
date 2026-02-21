@@ -1171,7 +1171,6 @@ export default function SetupScreen() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:ital,wght@0,400;0,500;1,400&family=DM+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: #05050a; }
 

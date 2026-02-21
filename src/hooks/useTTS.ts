@@ -1,21 +1,44 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
+import { textToSpeech } from '../services/openai';
 
-/**
- * Hook for TTS playback with in-memory caching.
- *
- * TODO: Implement using services/openai.ts textToSpeech
- * - Cache audio per question ID in a Map
- * - Return { speak, isPlaying }
- */
 export function useTTS() {
   const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const speak = async (_text: string, _questionId?: string) => {
-    // TODO: Check cache, call textToSpeech if miss, play via Audio element
+  const speak = useCallback(async (text: string) => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
     setIsPlaying(true);
-    console.warn('useTTS.speak not implemented');
-    setIsPlaying(false);
-  };
+    try {
+      const blob = await textToSpeech(text);
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
 
-  return { speak, isPlaying };
+      await new Promise<void>((resolve, reject) => {
+        audio.onended = () => {
+          URL.revokeObjectURL(url);
+          resolve();
+        };
+        audio.onerror = () => reject(new Error('Audio playback failed'));
+        audio.play();
+      });
+    } finally {
+      setIsPlaying(false);
+      audioRef.current = null;
+    }
+  }, []);
+
+  const stopPlayback = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setIsPlaying(false);
+  }, []);
+
+  return { speak, isPlaying, stopPlayback };
 }
