@@ -1,29 +1,43 @@
-import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { InterviewProvider } from './context/InterviewContext';
 import SetupScreen from './screens/SetupScreen';
-import InterviewScreen from './screens/InterviewScreen';
-import FeedbackScreen from './screens/FeedbackScreen';
 
-function ScrollToTop() {
-  const { pathname } = useLocation();
+const InterviewScreen = lazy(() => import('./screens/InterviewScreen'));
+const FeedbackScreen = lazy(() => import('./screens/FeedbackScreen'));
 
-  useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-  }, [pathname]);
-
-  return null;
-}
+const loadingFallback = (
+  <div style={{
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#09090f',
+    color: '#64748b',
+    fontFamily: "'DM Sans', sans-serif",
+    fontSize: '14px',
+  }}>
+    Loading...
+  </div>
+);
 
 export default function App() {
   return (
     <BrowserRouter>
       <InterviewProvider>
-        <ScrollToTop />
         <Routes>
-          <Route path="/" element={<SetupScreen />} />
-          <Route path="/interview" element={<InterviewScreen />} />
-          <Route path="/feedback" element={<FeedbackScreen />} />
+          <Route path="/" element={<div className="page-enter"><SetupScreen /></div>} />
+          <Route path="/interview" element={
+            <Suspense fallback={loadingFallback}>
+              <div className="page-enter"><InterviewScreen /></div>
+            </Suspense>
+          } />
+          <Route path="/feedback" element={
+            <Suspense fallback={loadingFallback}>
+              <div className="page-enter"><FeedbackScreen /></div>
+            </Suspense>
+          } />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </InterviewProvider>
     </BrowserRouter>

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Speech bubble body -->
+  <path
+    d="M4 6C4 4.895 4.895 4 6 4H26C27.105 4 28 4.895 28 6V20C28 21.105 27.105 22 26 22H18L12 28V22H6C4.895 22 4 21.105 4 20V6Z"
+    fill="#6366f1"
+  />
+  <!-- Waveform lines inside bubble suggesting voice/audio -->
+  <rect x="9" y="11" width="2" height="4" rx="1" fill="white" opacity="0.9"/>
+  <rect x="13" y="9" width="2" height="8" rx="1" fill="white" opacity="0.9"/>
+  <rect x="17" y="10" width="2" height="6" rx="1" fill="white" opacity="0.9"/>
+  <rect x="21" y="12" width="2" height="2" rx="1" fill="white" opacity="0.9"/>
+</svg>

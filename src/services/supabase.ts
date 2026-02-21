@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { Question, Session, Role, Difficulty } from '../types';
+import type { Question, Session, Role, Difficulty } from '../types';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,

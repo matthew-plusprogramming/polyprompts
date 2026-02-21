@@ -2,6 +2,13 @@ export type Role = 'swe_intern' | 'pm_intern';
 export type Difficulty = 'easy' | 'medium' | 'hard';
 export type ScoreLevel = 'Getting Started' | 'Developing' | 'Solid' | 'Strong';
 
+export interface ResumeData {
+  skills: string[];
+  experience: string[];
+  projects: string[];
+  education: string;
+}
+
 export interface Question {
   id: string;
   text: string;
@@ -11,9 +18,8 @@ export interface Question {
 }
 
 export interface DimensionScore {
-  level: ScoreLevel | null;
-  explanation: string | null;
-  percent?: number | null;
+  level: ScoreLevel;
+  explanation: string;
 }
 
 export interface ScoringResult {
@@ -27,6 +33,10 @@ export interface ScoringResult {
   };
   suggestions: [string, string, string];
   followUp: string;
+  overallSummary: string;
+  strongestDimension: string;
+  weakestDimension: string;
+  positiveCallouts: [string, string];
 }
 
 export interface Session {
@@ -52,17 +62,27 @@ export interface InterviewState {
   fillerCount: number;
   wordsPerMinute: number;
   speakingDurationSeconds: number;
+  totalDurationSeconds: number;
+  resumeData: ResumeData | null;
+  sessionHistory: Session[];
+  ttsVoice: string;
+  ttsSpeed: number;
 }
 
 export type InterviewAction =
   | { type: 'SET_ROLE'; payload: Role }
   | { type: 'SET_DIFFICULTY'; payload: Difficulty }
   | { type: 'SET_QUESTION'; payload: Question }
+  | { type: 'SET_RESUME_DATA'; payload: ResumeData }
   | { type: 'START_RECORDING' }
   | { type: 'STOP_RECORDING'; payload: Blob }
   | { type: 'UPDATE_TRANSCRIPT'; payload: string }
   | { type: 'UPDATE_METRICS'; payload: { fillerCount: number; wordsPerMinute: number; speakingDurationSeconds: number } }
   | { type: 'START_SCORING' }
   | { type: 'SET_RESULT'; payload: ScoringResult }
+  | { type: 'SET_TOTAL_DURATION'; payload: number }
   | { type: 'RETRY' }
-  | { type: 'NEXT_QUESTION' };
+  | { type: 'NEXT_QUESTION' }
+  | { type: 'SAVE_SESSION'; payload: Session }
+  | { type: 'SET_TTS_VOICE'; payload: string }
+  | { type: 'SET_TTS_SPEED'; payload: number };
