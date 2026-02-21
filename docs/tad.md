@@ -17,7 +17,7 @@
 ### AI / ML Services
 
 - **OpenAI ChatGPT API** — Single provider for the core intelligence: generating interview questions, scoring answers against our STAR rubric, producing coaching feedback, and crafting follow-up questions. Using one provider keeps our integration surface small and our API key management simple.
-- **OpenAI Whisper** — Accurate speech-to-text that handles diverse accents well, which matters for a product built around speaking. Pairs naturally with the rest of our OpenAI stack — same auth, same SDK, same billing.
+- **Deepgram (nova-2)** — Real-time streaming speech-to-text via WebSocket. Provides high-accuracy transcription with built-in filler word detection (`smart_format`, `filler_words`). Eliminates the post-recording Whisper latency by building the transcript incrementally as the user speaks.
 - **OpenAI TTS** — Makes the interviewer feel like a person, not a text box. Staying within the OpenAI ecosystem means one SDK and one set of API patterns across LLM, STT, and TTS.
 
 ### Browser APIs
@@ -55,15 +55,14 @@ The system is a client-heavy single-page app with a thin Express proxy that secu
 ### Data Flow — One Interview Loop
 
 1. **Setup → Interview:** User picks role \+ difficulty. Frontend fetches a question from the question bank (Supabase or local seed data). Frontend calls the proxy's TTS endpoint to convert the question text to audio. Audio plays through the browser.
-2. **Interview — Recording:** User speaks. MediaRecorder captures audio chunks. Live transcript updates via Web Speech API (browser-native, zero cost) for real-time display. When the user clicks "I'm done," the full audio blob is sent to the proxy's Whisper endpoint for the authoritative transcript.
-3. **Interview → Scoring:** The authoritative Whisper transcript \+ original question are sent to the proxy's scoring endpoint, which forwards to ChatGPT. ChatGPT returns structured JSON: rubric scores, suggestions, and a follow-up prompt. The proxy streams this response back to the frontend.
+2. **Interview — Recording:** User speaks. MediaRecorder captures audio chunks. Simultaneously, mic audio is streamed via WebSocket to Deepgram (nova-2) which returns real-time interim and final transcript segments with filler word annotations. When the user clicks "I'm done," the accumulated Deepgram transcript is used directly — no post-recording transcription step needed.
+3. **Interview → Scoring:** The Deepgram transcript \+ original question are sent to the scoring endpoint (ChatGPT). ChatGPT returns structured JSON: rubric scores, suggestions, and a follow-up prompt.
 4. **Scoring → Feedback:** Frontend renders the scorecard, suggestions, and follow-up. Session data (transcript, scores, question) is written to Supabase (direct).
 5. **Feedback → Loop:** User picks "Try Again" (same question, new attempt) or "Next Question" (new question from the bank). On retry, previous attempt data is kept for side-by-side comparison.
 
-### Why Two STT Paths?
+### Single STT Path — Deepgram Streaming
 
-- **Web Speech API (live):** Free, instant, runs in-browser. Good enough for a live transcript that helps the user see their words on screen. Not reliable enough to score against.
-- **Whisper (authoritative):** Costs money and adds latency (\~2-5s for a 2-minute answer), but produces an accurate transcript we can trust for rubric scoring. Only called once per answer, after the user finishes.
+Deepgram nova-2 via WebSocket provides a single high-quality transcription path that serves both live display and scoring. The transcript accumulates in real-time as the user speaks — when they click "I'm done," the transcript is already complete. This eliminates the 2-5 second Whisper wait that existed in the original dual-path (Web Speech API + Whisper) architecture.
 
 ---
 
@@ -263,28 +262,20 @@ app.listen(process.env.PORT || 3001);
 - **Fallback:** Pre-record TTS audio for the seeded demo questions. If the API is slow or down during the demo, play the local files instead.
 - Cache TTS audio per question in memory (`Map<questionId, ArrayBuffer>`) so retries don't re-call the API.
 
-### STT — Live Transcript (Web Speech API)
+### STT — Deepgram Streaming (Real-Time)
 
 1. User speaks into mic
-2. MediaRecorder captures audio (for Whisper later)
-3. **Simultaneously:** Web Speech API (SpeechRecognition) streams interim results
-4. `onresult` callback updates `liveTranscript` in state
-5. TranscriptPanel re-renders with new text
+2. `useDeepgramTranscription` hook fetches a 60-second temp key from `/api/key`
+3. Opens WebSocket to `wss://api.deepgram.com/v1/listen` with nova-2 model
+4. AudioContext at 16 kHz + ScriptProcessor converts mic audio to Int16 PCM and streams to Deepgram
+5. Deepgram returns interim and final transcript segments via WebSocket messages
+6. Final segments accumulate; interim segment updates live display
+7. When user clicks "I'm done," accumulated transcript is used directly for scoring — no post-recording wait
 
-- `SpeechRecognition.continuous = true` and `interimResults = true` for streaming text.
-- Chrome-only in practice (Firefox/Safari support is spotty). Acceptable for a hackathon demo.
-- If Web Speech API is unavailable, fall back to showing "Transcript will appear after you finish" and rely on Whisper only.
-
-### STT — Authoritative Transcript (Whisper)
-
-1. User clicks "I'm done"
-2. `MediaRecorder.stop()` produces final audio Blob (webm/opus)
-3. POST to proxy's `/api/transcribe` endpoint (multipart form data), which forwards to Whisper (model: `whisper-1`)
-4. Returns `{ text: "..." }` — this transcript is what gets scored
-
-- Frontend sends as `multipart/form-data`. The proxy uses `multer` to receive the blob and forwards it to Whisper.
-- Expected latency: 2-5 seconds for a 1-3 minute answer.
-- During this wait, show a "thinking" state with the waveform doing a subtle idle animation — matches the PRD's "interviewer collecting their thoughts" moment.
+- Deepgram params: `model=nova-2, language=en-US, smart_format=true, filler_words=true, interim_results=true, utterance_end_ms=1000, encoding=linear16, sample_rate=16000, channels=1`
+- Cross-browser compatible (uses standard WebSocket + AudioContext, no browser-specific speech API)
+- Filler words (um, uh, etc.) are preserved in transcript for coaching metrics
+- MediaRecorder still captures audio blob in parallel for potential future replay
 
 ### Filler Word Detection (Client-Side)
 
@@ -350,15 +341,11 @@ The scoring API is a single ChatGPT call. The prompt structure:
 - _Alternative considered:_ No backend (frontend calls OpenAI directly with `dangerouslyAllowBrowser: true`) — exposes API keys in the browser bundle. Acceptable for a local-only hackathon demo but a bad habit to build on.
 - _Alternative considered:_ Supabase Edge Functions — cold starts add latency to first requests; team is less familiar with Deno runtime.
 
-**Live STT** — Web Speech API (browser-native).
+**STT** — Deepgram nova-2 streaming via WebSocket.
 
-- _Why:_ Zero cost, zero setup, low latency. Only used for live display, not scoring.
-- _Alternative:_ Whisper streaming — adds latency \+ cost for a display-only feature.
-
-**Authoritative STT** — Whisper (called once after "I'm done").
-
-- _Why:_ Accurate, handles accents well, produces clean text for scoring.
-- _Alternative:_ Web Speech API final transcript — too unreliable for rubric scoring.
+- _Why:_ Single high-quality STT path that serves both live display and scoring. Eliminates the 2-5 second Whisper wait after recording stops. Built-in filler word detection. Cross-browser compatible (no Chrome-only Web Speech API dependency).
+- _Alternative considered:_ Web Speech API (live) + Whisper (authoritative) — the original dual-path approach. Web Speech API is Chrome-only and unreliable; Whisper adds post-recording latency.
+- _Alternative considered:_ Whisper streaming — not available as a real-time WebSocket API from OpenAI.
 
 **State management** — React Context \+ useReducer.
 
@@ -391,6 +378,8 @@ The scoring API is a single ChatGPT call. The prompt structure:
 
 **polyprompts/**
 
+- **api/**
+  - `key.js` — Vercel serverless function: exchanges `DEEPGRAM_API_KEY` for a 60-second scoped temp key
 - **server/**
   - `index.ts` — Express app entry point, route registration, CORS
   - **routes/**
@@ -422,7 +411,7 @@ The scoring API is a single ChatGPT call. The prompt structure:
     - `audioRecorder.ts` — MediaRecorder wrapper
   - **hooks/**
     - `useAudioRecorder.ts` — MediaRecorder lifecycle
-    - `useSpeechRecognition.ts` — Web Speech API lifecycle
+    - `useDeepgramTranscription.ts` — Deepgram WebSocket streaming transcription
     - `useTTS.ts` — TTS playback \+ caching
     - `useFillerDetection.ts` — Filler word counting
   - **types/**
@@ -452,6 +441,12 @@ The scoring API is a single ChatGPT call. The prompt structure:
 | `VITE_API_URL`           | `http://localhost:3001`            |
 
 The frontend only needs Supabase keys (safe to expose) and the proxy URL. No OpenAI key on the client.
+
+### Vercel Serverless Environment Variables
+
+| Variable          | Example Value           |
+| :---------------- | :---------------------- |
+| `DEEPGRAM_API_KEY` | Deepgram API key (server-side only, used by `api/key.js` to mint temp keys) |
 
 ### Server Environment Variables (`server/.env.example`)
 
@@ -531,8 +526,8 @@ These aren't hard requirements — they're targets that keep the demo feeling re
 | Interaction                        | Target         | Notes                                                                              |
 | :--------------------------------- | :------------- | :--------------------------------------------------------------------------------- |
 | Setup → first question audio plays | \< 3 seconds   | TTS latency is the bottleneck. Pre-cache demo questions.                           |
-| Live transcript update             | \< 1-2 seconds | Web Speech API handles this natively.                                              |
-| "I'm done" → feedback screen       | \< 8 seconds   | Whisper (\~3s) \+ ChatGPT scoring (\~5s) in sequence. Show a "thinking" animation. |
+| Live transcript update             | \< 500ms       | Deepgram streaming returns interim results in near real-time.                      |
+| "I'm done" → feedback screen       | \< 5 seconds   | No Whisper wait — transcript already built. ChatGPT scoring (\~3-5s). Show a "thinking" animation. |
 | Retry → question audio plays       | Instant        | TTS audio cached from first play.                                                  |
 
 ### Parallelization Opportunity
