@@ -7,7 +7,7 @@ import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { analyzePause, scoreAnswer, prefetchTTS } from '../services/openai';
 import { countFillers } from '../hooks/useFillerDetection';
 import type { QuestionResult } from '../types';
-import WaveformVisualizer from '../components/WaveformVisualizer';
+import ParticleVisualizer from '../components/ParticleVisualizer';
 import SilenceNudge from '../components/SilenceNudge';
 import cameraOnIcon from '../Icons/CameraOn.png';
 import cameraOffIcon from '../Icons/cameraOff.png';
@@ -1284,8 +1284,8 @@ export default function InterviewScreen() {
                 boxShadow: 'inset 0 0 26px rgba(255, 255, 255, 0.05), 0 10px 24px rgba(0, 0, 0, 0.35)',
               }}
             >
-              <div style={{ width: 'calc(100% + 2.3rem)', marginLeft: '-1.15rem', marginRight: '-1.15rem' }}>
-                <WaveformVisualizer height={285} micEnabled={micEnabled} />
+              <div style={{ width: '100%', height: '100%', flex: '1 1 auto', minHeight: 0 }}>
+                <ParticleVisualizer micEnabled={micEnabled} isSpeaking={userSpeaking} />
               </div>
             </section>
           </div>
