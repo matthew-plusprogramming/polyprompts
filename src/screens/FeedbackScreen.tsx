@@ -59,7 +59,23 @@ function getOverallPercent(result: ScoringResult | null) {
 export default function FeedbackScreen() {
   const { state, dispatch } = useInterview();
   const navigate = useNavigate();
-  const result = state.currentResult;
+
+  // Use questionResults if available, otherwise fall back to single result
+  const questionResults = state.questionResults;
+  const hasMultipleResults = questionResults.length > 0;
+
+  // For the radar/score display, use the last scored result (or currentResult as fallback)
+  const lastScoredResult = useMemo(() => {
+    if (hasMultipleResults) {
+      // Find the last question that has been scored
+      for (let i = questionResults.length - 1; i >= 0; i--) {
+        if (questionResults[i].scoringResult) return questionResults[i].scoringResult;
+      }
+    }
+    return state.currentResult;
+  }, [hasMultipleResults, questionResults, state.currentResult]);
+
+  const result = lastScoredResult;
   const overallPercent = getOverallPercent(result);
   const hasResult = Boolean(result);
 
@@ -185,8 +201,12 @@ export default function FeedbackScreen() {
       <div className="feedback__frame">
         <header className="feedback__header">
           <div>
-            {/* <p className="feedback__eyebrow">Interview Feedback</p> */}
             <h1 className="feedback__title">Starly Summary</h1>
+            {hasMultipleResults && (
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#9e9e9e', letterSpacing: '0.06em' }}>
+                {questionResults.length} question{questionResults.length !== 1 ? 's' : ''} answered
+              </p>
+            )}
           </div>
         </header>
 
@@ -349,7 +369,7 @@ export default function FeedbackScreen() {
           </div>
           <div className="feedback__card feedback__card--review">
             <div className="feedback__review-header">
-              <h2>Review Questions & Response</h2>
+              <h2>Review Questions & Responses</h2>
               <button
                 type="button"
                 className="feedback__review-toggle"
@@ -361,20 +381,83 @@ export default function FeedbackScreen() {
 
             {reviewOpen && (
               <div className="feedback__review-body">
-                <div className="feedback__review-block">
-                  <span>Question Asked</span>
-                  <p>
-                    {state.currentQuestion?.text ??
-                      "No question captured yet."}
-                  </p>
-                </div>
-                <div className="feedback__review-block">
-                  <span>Your Response</span>
-                  <p>
-                    {state.liveTranscript ||
-                      "Response will appear after recording."}
-                  </p>
-                </div>
+                {/* Multi-question: show each Q&A */}
+                {hasMultipleResults ? (
+                  questionResults.map((qr, idx) => (
+                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <div className="feedback__review-block">
+                        <span>Question {idx + 1}</span>
+                        <p>{qr.question.text}</p>
+                      </div>
+                      <div className="feedback__review-block">
+                        <span>Your Response</span>
+                        <p>{qr.transcript || "Response will appear after recording."}</p>
+                      </div>
+                      {qr.scoringResult && (
+                        <div style={{
+                          display: 'flex',
+                          gap: '0.5rem',
+                          flexWrap: 'wrap',
+                          padding: '0.5rem 0.9rem',
+                          borderRadius: '10px',
+                          background: 'rgba(255,255,255,0.02)',
+                          border: '1px solid rgba(255,255,255,0.06)',
+                        }}>
+                          <span style={{
+                            fontSize: '0.65rem',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.14em',
+                            color: '#9d9d9d',
+                            width: '100%',
+                            marginBottom: '0.2rem',
+                          }}>
+                            Score: {getOverallPercent(qr.scoringResult)}%
+                          </span>
+                          <p style={{ margin: 0, fontSize: '0.78rem', color: '#d4d4d4' }}>
+                            {qr.scoringResult.overallSummary}
+                          </p>
+                        </div>
+                      )}
+                      {!qr.scoringResult && (
+                        <div style={{
+                          padding: '0.5rem 0.9rem',
+                          borderRadius: '10px',
+                          background: 'rgba(255,255,255,0.02)',
+                          border: '1px solid rgba(255,255,255,0.06)',
+                          fontSize: '0.75rem',
+                          color: '#6b6b6b',
+                          fontStyle: 'italic',
+                        }}>
+                          Scoring in progress...
+                        </div>
+                      )}
+                      {idx < questionResults.length - 1 && (
+                        <div style={{
+                          height: '1px',
+                          background: 'rgba(255,255,255,0.08)',
+                          margin: '0.5rem 0',
+                        }} />
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <>
+                    <div className="feedback__review-block">
+                      <span>Question Asked</span>
+                      <p>
+                        {state.currentQuestion?.text ??
+                          "No question captured yet."}
+                      </p>
+                    </div>
+                    <div className="feedback__review-block">
+                      <span>Your Response</span>
+                      <p>
+                        {state.liveTranscript ||
+                          "Response will appear after recording."}
+                      </p>
+                    </div>
+                  </>
+                )}
 
                 <div className="feedback__review-critique">
                   <div>
@@ -420,8 +503,8 @@ export default function FeedbackScreen() {
                 <strong>{state.difficulty}</strong>
               </div>
               <div>
-                <span>Question</span>
-                <strong>{state.currentQuestion?.category ?? "General"}</strong>
+                <span>Questions</span>
+                <strong>{hasMultipleResults ? `${questionResults.length} answered` : (state.currentQuestion?.category ?? "General")}</strong>
               </div>
             </div>
             <div className="feedback__card">
@@ -437,10 +520,6 @@ export default function FeedbackScreen() {
               )}
             </div>
 
-            {/* <div className="feedback__card feedback__card--highlight">
-              <h2>Follow-up Prompt</h2>
-              <p>{result?.followUp ?? 'Follow-up coaching question will appear here.'}</p>
-            </div> */}
           <div className="feedback__actions">
             <button className="feedback__button" onClick={handleRetry}>
               Try Again
@@ -449,7 +528,7 @@ export default function FeedbackScreen() {
               className="feedback__button feedback__button--ghost"
               onClick={handleNext}
             >
-              Next Question
+              Next Interview
             </button>
           </div>
 

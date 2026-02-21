@@ -4,9 +4,9 @@ import { useInterview } from '../context/InterviewContext';
 import { useTTS } from '../hooks/useTTS';
 import { useDeepgramTranscription } from '../hooks/useDeepgramTranscription';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
-import { analyzePause, scoreAnswer, textToSpeech } from '../services/openai';
-import { seededQuestions } from '../data/questions';
+import { analyzePause, scoreAnswer } from '../services/openai';
 import { countFillers } from '../hooks/useFillerDetection';
+import type { QuestionResult } from '../types';
 import WaveformVisualizer from '../components/WaveformVisualizer';
 import SilenceNudge from '../components/SilenceNudge';
 import cameraOnIcon from '../Icons/CameraOn.png';
@@ -25,6 +25,7 @@ type ScreenPhase =
   | 'silence-detected'
   | 'asking-done'
   | 'mic-error'
+  | 'transitioning'
   | 'finished';
 
 export default function InterviewScreen() {
@@ -63,6 +64,7 @@ export default function InterviewScreen() {
   const analyzingRef = useRef(false);
   const finishingRef = useRef(false);
   const handleDoneRef = useRef<() => Promise<void>>(async () => {});
+  const beginNextQuestionRef = useRef<() => Promise<void>>(async () => {});
   const activeRef = useRef(false);
   const recordingStartRef = useRef<number>(0);
   const speakRef = useRef(speak);
@@ -70,6 +72,8 @@ export default function InterviewScreen() {
   const stateRef = useRef(state);
   stateRef.current = state;
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingScoringRef = useRef<Promise<void>[]>([]);
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
   const clearSilenceTimer = useCallback(() => {
     if (silenceTimerRef.current) {
@@ -245,14 +249,15 @@ export default function InterviewScreen() {
     onMicDisconnect: handleMicDisconnect,
   });
 
-  // ─── Matthew's handleStart flow ───
+  // ─── handleStart: begins TTS + recording for the current question ───
   const handleStart = async () => {
     if (!state.currentQuestion || activeRef.current) return;
 
     setSessionId();
     log.info('Interview starting', { questionId: state.currentQuestion.id, role: state.role, difficulty: state.difficulty });
 
-    const audioCtx = new AudioContext();
+    const audioCtx = audioCtxRef.current ?? new AudioContext();
+    audioCtxRef.current = audioCtx;
 
     // Step 1: Prime mic permission inside user gesture, then release.
     try {
@@ -263,7 +268,6 @@ export default function InterviewScreen() {
     } catch (e) {
       log.error('Mic access failed', { error: String(e) });
       setStatusText('Microphone access denied. Please allow mic access and try again.');
-      void audioCtx.close();
       return;
     }
 
@@ -299,7 +303,6 @@ export default function InterviewScreen() {
       activeRef.current = false;
       dispatch({ type: 'STOP_RECORDING', payload: new Blob() });
       setPhase('ready');
-      void audioCtx.close();
       return;
     }
 
@@ -312,7 +315,77 @@ export default function InterviewScreen() {
     }
   };
 
-  // ─── Matthew's handleDone flow ───
+  // ─── beginNextQuestion: TTS transition + start recording for next question ───
+  const beginNextQuestion = async () => {
+    const nextIdx = state.currentQuestionIndex + 1;
+    const nextQuestion = state.questions[nextIdx];
+    if (!nextQuestion) {
+      log.warn('beginNextQuestion: no next question', { nextIdx, totalQuestions: state.questions.length });
+      return;
+    }
+
+    log.info('beginNextQuestion', { nextIdx, questionId: nextQuestion.id, totalQuestions: state.questions.length });
+
+    const audioCtx = audioCtxRef.current ?? new AudioContext();
+    audioCtxRef.current = audioCtx;
+
+    // Advance state to next question
+    dispatch({ type: 'ADVANCE_QUESTION' });
+
+    // Brief transition phrase
+    setPhase('transitioning');
+    setStatusText('Moving to next question...');
+    try {
+      await speak("Great, let's move on to the next question.", state.ttsVoice, state.ttsSpeed);
+    } catch (e) {
+      log.warn('Transition TTS failed', { error: String(e) });
+    }
+
+    // Speak the next question (use pre-computed nextQuestion, no stateRef race)
+    setPhase('speaking-question');
+    setStatusText('Reading question aloud...');
+    try {
+      await speak(nextQuestion.text, state.ttsVoice, state.ttsSpeed);
+    } catch (e) {
+      log.error('TTS error — continuing without audio', { error: String(e) });
+    }
+
+    // Brief thinking pause
+    setPhase('thinking');
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // Start recording for the next question
+    setPhase('recording');
+    setStatusText('Listening...');
+    setShortAnswerWarning(null);
+    setSilenceMessage(undefined);
+    activeRef.current = true;
+    waitCountRef.current = 0;
+    dispatch({ type: 'START_RECORDING' });
+
+    let micStream: MediaStream | null = null;
+    try {
+      micStream = await startRecording(undefined, audioCtx);
+      recordingStartRef.current = Date.now();
+    } catch (e) {
+      log.error('Recording failed for next question', { error: String(e) });
+      setStatusText('Microphone setup failed.');
+      activeRef.current = false;
+      dispatch({ type: 'STOP_RECORDING', payload: new Blob() });
+      setPhase('ready');
+      return;
+    }
+
+    if (micStream) {
+      try {
+        await deepgram.start(micStream);
+      } catch (e) {
+        log.error('Deepgram transcription failed for next question', { error: String(e) });
+      }
+    }
+  };
+
+  // ─── handleDone: handles end of answer for current question ───
   const handleDone = useCallback(async () => {
     if (finishingRef.current) return;
     log.info('handleDone called');
@@ -331,7 +404,21 @@ export default function InterviewScreen() {
     clearSilenceTimer();
     stopPlayback();
     deepgram.stop();
-    setPhase('finished');
+
+    const currentState = stateRef.current;
+    const currentIdx = currentState.currentQuestionIndex;
+    const isLastQuestion = currentIdx >= currentState.questions.length - 1;
+
+    log.info('handleDone decision', {
+      currentIdx,
+      totalQuestions: currentState.questions.length,
+      isLastQuestion,
+      questionIds: currentState.questions.map(q => q.id),
+    });
+
+    if (isLastQuestion) {
+      setPhase('finished');
+    }
 
     const totalDuration = Math.floor((Date.now() - recordingStartRef.current) / 1000);
     dispatch({ type: 'SET_TOTAL_DURATION', payload: totalDuration });
@@ -348,51 +435,96 @@ export default function InterviewScreen() {
         dispatch({ type: 'UPDATE_TRANSCRIPT', payload: transcript });
       }
 
-      if (transcript && state.currentQuestion) {
-        dispatch({ type: 'START_SCORING' });
+      const question = currentState.currentQuestion;
+      if (!transcript || !question) {
+        if (isLastQuestion) navigate('/feedback');
+        return;
+      }
 
-        // Pre-fetch next question TTS in background
-        const nextQuestions = seededQuestions.filter(q =>
-          q.role === state.role && q.difficulty === state.difficulty && q.id !== state.currentQuestion!.id
-        );
-        if (nextQuestions.length > 0) {
-          const nextQ = nextQuestions[Math.floor(Math.random() * nextQuestions.length)];
-          textToSpeech(nextQ.text).catch(() => {});
-        }
+      // Save question result (scoring starts as null)
+      const questionResult: QuestionResult = {
+        question,
+        transcript,
+        audioBlob: blob ?? undefined,
+        scoringResult: null,
+        metrics: {
+          fillerCount: countFillers(transcript),
+          wordsPerMinute: currentState.wordsPerMinute,
+          speakingDurationSeconds: Math.round(totalDuration),
+        },
+      };
+      dispatch({ type: 'SAVE_QUESTION_RESULT', payload: questionResult });
+
+      if (isLastQuestion) {
+        // Final question: score synchronously, wait for all pending, then navigate
+        dispatch({ type: 'START_SCORING' });
         try {
-          const result = await scoreAnswer(
-            transcript,
-            state.currentQuestion.text,
-            state.resumeData ?? undefined,
-          );
+          const result = await scoreAnswer(transcript, question.text, currentState.resumeData ?? undefined);
+          dispatch({ type: 'UPDATE_QUESTION_SCORING', payload: { index: currentIdx, scoringResult: result } });
           dispatch({ type: 'SET_RESULT', payload: result });
           dispatch({
             type: 'SAVE_SESSION',
             payload: {
               id: crypto.randomUUID(),
-              questionId: state.currentQuestion.id,
-              attemptNumber: state.previousAttempts.length + 1,
+              questionId: question.id,
+              attemptNumber: currentState.previousAttempts.length + 1,
               transcript,
               scores: result,
-              durationSeconds: state.speakingDurationSeconds,
+              durationSeconds: totalDuration,
               createdAt: new Date().toISOString(),
             },
           });
         } catch (err) {
           log.error('Scoring failed', { error: String(err) });
         }
-      }
 
-      log.info('Navigating to feedback');
-      navigate('/feedback');
+        // Wait for any pending background scoring to complete
+        await Promise.allSettled(pendingScoringRef.current);
+        pendingScoringRef.current = [];
+
+        log.info('Navigating to feedback');
+        navigate('/feedback');
+      } else {
+        // Non-final question: fire background scoring, advance to next
+        const scoringPromise = (async () => {
+          try {
+            const result = await scoreAnswer(transcript, question.text, currentState.resumeData ?? undefined);
+            dispatch({ type: 'UPDATE_QUESTION_SCORING', payload: { index: currentIdx, scoringResult: result } });
+            dispatch({
+              type: 'SAVE_SESSION',
+              payload: {
+                id: crypto.randomUUID(),
+                questionId: question.id,
+                attemptNumber: currentState.previousAttempts.length + 1,
+                transcript,
+                scores: result,
+                durationSeconds: totalDuration,
+                createdAt: new Date().toISOString(),
+              },
+            });
+          } catch (err) {
+            log.error('Background scoring failed for Q' + (currentIdx + 1), { error: String(err) });
+          }
+        })();
+        pendingScoringRef.current.push(scoringPromise);
+
+        // Begin next question flow
+        finishingRef.current = false;
+        await beginNextQuestionRef.current();
+        return;
+      }
     } finally {
       finishingRef.current = false;
     }
-  }, [clearSilenceTimer, dispatch, navigate, deepgram, state.currentQuestion, state.previousAttempts.length, state.resumeData, state.role, state.difficulty, state.speakingDurationSeconds, stopPlayback, stopRecording, setPhase]);
+  }, [clearSilenceTimer, dispatch, navigate, deepgram, stopPlayback, stopRecording, setPhase]);
 
   useEffect(() => {
     handleDoneRef.current = handleDone;
   }, [handleDone]);
+
+  useEffect(() => {
+    beginNextQuestionRef.current = beginNextQuestion;
+  });
 
   // ─── Matthew's effects ───
 
@@ -420,12 +552,19 @@ export default function InterviewScreen() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [phase, navigate]);
 
-  // Guard: redirect to home if no question loaded
+  // Guard: redirect to home if no questions loaded
   useEffect(() => {
-    if (!state.currentQuestion) {
+    if (state.questions.length === 0 && !state.currentQuestion) {
+      log.warn('No questions loaded, redirecting to home');
       navigate('/');
+    } else {
+      log.info('InterviewScreen mounted/updated', {
+        questionsCount: state.questions.length,
+        currentQuestionIndex: state.currentQuestionIndex,
+        currentQuestionId: state.currentQuestion?.id,
+      });
     }
-  }, [state.currentQuestion, navigate]);
+  }, [state.questions.length, state.currentQuestion, navigate]);
 
 
   // Keep context transcript in sync
@@ -481,6 +620,11 @@ export default function InterviewScreen() {
   const micEnabled = phase === 'recording' || phase === 'silence-detected' || phase === 'asking-done';
 
   // ─── Phase badge config ───
+  // ─── Question progress indicator ───
+  const questionLabel = state.questions.length > 1
+    ? `Q${state.currentQuestionIndex + 1}/${state.questions.length}`
+    : '';
+
   const phaseLabel: Record<ScreenPhase, string> = {
     ready: 'Ready',
     'speaking-question': 'Interviewer is asking\u2026',
@@ -489,6 +633,7 @@ export default function InterviewScreen() {
     'silence-detected': 'Analyzing pause\u2026',
     'asking-done': 'Are you done?',
     'mic-error': 'Microphone error',
+    transitioning: 'Next question\u2026',
     finished: 'Processing\u2026',
   };
 
@@ -500,6 +645,7 @@ export default function InterviewScreen() {
     'silence-detected': '#f59e0b',
     'asking-done': '#34d399',
     'mic-error': '#f87171',
+    transitioning: '#a78bfa',
     finished: '#6b7280',
   };
 
@@ -699,6 +845,23 @@ export default function InterviewScreen() {
               {phaseLabel[phase]}
             </span>
           </div>
+          {questionLabel && (
+            <div
+              style={{
+                padding: '4px 10px',
+                background: 'rgba(99,102,241,0.1)',
+                border: '1px solid rgba(99,102,241,0.25)',
+                borderRadius: '999px',
+                fontFamily: "'DM Mono', monospace",
+                fontSize: '11px',
+                fontWeight: '600',
+                letterSpacing: '0.06em',
+                color: '#a5b4fc',
+              }}
+            >
+              {questionLabel}
+            </div>
+          )}
         </div>
 
         <div
@@ -768,7 +931,7 @@ export default function InterviewScreen() {
             <button
               type="button"
               onClick={() => void handleDone()}
-              disabled={phase === 'finished' || phase === 'speaking-question' || phase === 'thinking'}
+              disabled={phase === 'finished' || phase === 'speaking-question' || phase === 'thinking' || phase === 'transitioning'}
               style={{
                 padding: '0.55rem 0.95rem',
                 borderRadius: '12px',
@@ -779,8 +942,8 @@ export default function InterviewScreen() {
                 fontWeight: 700,
                 letterSpacing: '0.08em',
                 boxShadow: '0 0 18px rgba(255, 255, 255, 0.22)',
-                cursor: phase === 'finished' ? 'not-allowed' : 'pointer',
-                opacity: phase === 'finished' || phase === 'speaking-question' || phase === 'thinking' ? 0.5 : 1,
+                cursor: phase === 'finished' || phase === 'transitioning' ? 'not-allowed' : 'pointer',
+                opacity: phase === 'finished' || phase === 'speaking-question' || phase === 'thinking' || phase === 'transitioning' ? 0.5 : 1,
               }}
             >
               End
@@ -1051,6 +1214,48 @@ export default function InterviewScreen() {
             }}
           >
             Interviewer is asking your question aloud&hellip;
+          </span>
+        </div>
+      )}
+
+      {/* Transitioning overlay */}
+      {phase === 'transitioning' && (
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '10px',
+            padding: '12px 24px',
+            marginBottom: '0.5rem',
+            background: 'rgba(167,139,250,0.07)',
+            border: '1px solid rgba(167,139,250,0.18)',
+            borderRadius: '14px',
+            animation: 'fadeIn 0.3s ease',
+          }}
+        >
+          <div
+            style={{
+              width: '7px',
+              height: '7px',
+              borderRadius: '50%',
+              background: '#a78bfa',
+              flexShrink: 0,
+              animation: 'pulse-ring 1.2s ease-out infinite',
+            }}
+          />
+          <span
+            style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#c4b5fd',
+              letterSpacing: '0.01em',
+            }}
+          >
+            Moving to the next question&hellip;
           </span>
         </div>
       )}

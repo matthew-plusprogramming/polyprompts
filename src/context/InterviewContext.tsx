@@ -11,7 +11,10 @@ const STORAGE_KEY_PREFS = 'polyprompts-prefs';
 const initialState: InterviewState = {
   role: 'swe_intern',
   difficulty: 'medium',
+  questions: [],
+  currentQuestionIndex: 0,
   currentQuestion: null,
+  questionResults: [],
   isRecording: false,
   liveTranscript: '',
   audioBlob: null,
@@ -36,6 +39,45 @@ function interviewReducer(state: InterviewState, action: InterviewAction): Inter
       return { ...state, difficulty: action.payload };
     case 'SET_QUESTION':
       return { ...state, currentQuestion: action.payload };
+    case 'SET_QUESTIONS': {
+      const questions = action.payload;
+      return {
+        ...state,
+        questions,
+        currentQuestionIndex: 0,
+        currentQuestion: questions[0] ?? null,
+        questionResults: [],
+      };
+    }
+    case 'SAVE_QUESTION_RESULT':
+      return {
+        ...state,
+        questionResults: [...state.questionResults, action.payload],
+      };
+    case 'UPDATE_QUESTION_SCORING': {
+      const { index, scoringResult } = action.payload;
+      const updatedResults = [...state.questionResults];
+      if (updatedResults[index]) {
+        updatedResults[index] = { ...updatedResults[index], scoringResult };
+      }
+      return { ...state, questionResults: updatedResults };
+    }
+    case 'ADVANCE_QUESTION': {
+      const nextIndex = state.currentQuestionIndex + 1;
+      return {
+        ...state,
+        currentQuestionIndex: nextIndex,
+        currentQuestion: state.questions[nextIndex] ?? null,
+        // Reset per-question recording state
+        isRecording: false,
+        liveTranscript: '',
+        audioBlob: null,
+        fillerCount: 0,
+        wordsPerMinute: 0,
+        speakingDurationSeconds: 0,
+        totalDurationSeconds: 0,
+      };
+    }
     case 'SET_RESUME_DATA':
       return { ...state, resumeData: action.payload };
     case 'START_RECORDING':
@@ -55,6 +97,9 @@ function interviewReducer(state: InterviewState, action: InterviewAction): Inter
     case 'RETRY':
       return {
         ...state,
+        currentQuestionIndex: 0,
+        currentQuestion: state.questions[0] ?? state.currentQuestion,
+        questionResults: [],
         isRecording: false,
         liveTranscript: '',
         audioBlob: null,
