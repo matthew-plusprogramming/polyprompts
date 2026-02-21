@@ -1,5 +1,6 @@
-import { createContext, useContext, useReducer, ReactNode, Dispatch } from 'react';
-import { InterviewState, InterviewAction } from '../types';
+import { createContext, useContext, useReducer} from 'react';
+import type {ReactNode, Dispatch } from 'react';
+import type { InterviewState, InterviewAction } from '../types';
 
 const initialState: InterviewState = {
   role: 'swe_intern',
