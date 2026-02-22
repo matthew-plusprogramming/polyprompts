@@ -98,7 +98,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "OPENAI_API_KEY not set" });
   }
 
-  const { questions, answers } = req.body ?? {};
+  const { questions, answers, resumeText, jobDescription } = req.body ?? {};
 
   if (!Array.isArray(questions) || !Array.isArray(answers) || questions.length !== answers.length) {
     return res.status(400).json({ error: "questions and answers must be parallel arrays" });
@@ -107,6 +107,11 @@ export default async function handler(req, res) {
   const combined = questions
     .map((q, i) => `Question ${i + 1}: ${q}\nAnswer ${i + 1}: ${answers[i]}`)
     .join("\n\n");
+
+  const resumeContext =
+    resumeText && jobDescription
+      ? `\n\nCANDIDATE CONTEXT (use this to tailor your feedback):\nResume excerpt: ${String(resumeText).slice(0, 3000)}\nTarget role / Job description: ${String(jobDescription).slice(0, 2000)}\n`
+      : "";
 
   try {
     const response = await fetch("https://api.openai.com/v1/responses", {
@@ -118,15 +123,15 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: "gpt-4o-mini",
         input: `
-You are a strict but supportive software engineering interviewer.
+You are a strict but supportive software engineering interview coach giving feedback directly to the candidate. Always address them as "you" (second person). Never refer to them as "the candidate" or in third person.
 
 For EACH of the ${questions.length} questions in the transcript, do ALL of the following:
 1. Score these categories 0.0–100.0 with ONE decimal: response_organization, technical_knowledge, problem_solving, position_application, timing, personability
 2. Identify the BEST sentence EXACTLY as written. Put in "best_part_quote".
-3. Explain in 4-5 sentences in "best_part_explanation".
+3. Explain in 2-3 sentences in "best_part_explanation".
 4. Identify the WORST sentence EXACTLY as written. Put in "worst_part_quote".
-5. Explain in 4-5 sentences in "worst_part_explanation".
-6. Provide "what_went_well", "needs_improvement", "summary" (2-3 sentences each)
+5. Explain in 2-3 sentences in "worst_part_explanation".
+6. Provide "what_went_well", "needs_improvement", "summary" (1-2 sentences each)
 7. Provide "confidence_score" (0.0–100.0)
 
 FOR THE OVERALL INTERVIEW:
@@ -134,6 +139,7 @@ FOR THE OVERALL INTERVIEW:
 - Provide overall what_went_well, needs_improvement, summary
 
 You MUST return exactly ${questions.length} items in the "questions" array.
+${resumeContext}
 Transcript:
 ${combined}
 `,

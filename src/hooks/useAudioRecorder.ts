@@ -8,7 +8,7 @@ const log = createLogger('AudioRecorder');
 const vadLog = log.child('VAD');
 const volumeLog = log.child('Volume');
 
-const SILENCE_THRESHOLD = 0.09;
+const SILENCE_THRESHOLD = 0.06;
 const SILENCE_DURATION_MS = 3000;
 const VOLUME_CHECK_INTERVAL_MS = 100;
 
@@ -101,9 +101,10 @@ export function useAudioRecorder(options: UseAudioRecorderOptions) {
           } else if (
             Date.now() - silenceStartRef.current >= SILENCE_DURATION_MS
           ) {
-            volumeLog.info('Silence detected (4s of low volume)');
+            volumeLog.info('Silence detected (3.5s of low volume)');
+            isSilentRef.current = true;
             optionsRef.current.onSilenceStart?.();
-            // Reset timer so it fires again after another 3.5s of continued silence
+            // Reset timer so it fires again after another period of continued silence
             silenceStartRef.current = Date.now();
           }
         } else {
