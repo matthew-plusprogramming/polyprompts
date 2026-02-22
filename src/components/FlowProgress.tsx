@@ -135,7 +135,7 @@ export default function FlowProgress({ currentStep }: FlowProgressProps) {
               <span
                 style={{
                   marginTop: '7px',
-                  fontFamily: "'DM Mono', monospace",
+                  fontFamily: "'Josefin Sans', sans-serif",
                   fontSize: '10px',
                   fontWeight: isCurrent ? '600' : '400',
                   letterSpacing: '0.06em',

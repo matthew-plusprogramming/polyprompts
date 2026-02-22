@@ -866,12 +866,11 @@ export default function InterviewScreen() {
         background:
           'radial-gradient(circle at 12% -5%, rgba(255, 255, 255, 0.14), transparent 34%), radial-gradient(circle at 88% 8%, rgba(220, 220, 220, 0.12), transparent 32%), linear-gradient(145deg, rgba(8, 12, 18, 0.98), rgba(10, 10, 10, 0.96) 48%, rgba(14, 16, 20, 0.98)), repeating-linear-gradient(135deg, rgba(148, 163, 184, 0.04) 0px, rgba(148, 163, 184, 0.04) 1px, transparent 1px, transparent 15px)',
         boxShadow: '0 20px 80px rgba(2, 8, 22, 0.7), inset 0 0 45px rgba(255, 255, 255, 0.05)',
-        fontFamily: "'Space Grotesk', 'Segoe UI', sans-serif",
+        fontFamily: "'Josefin Sans', sans-serif",
       }}
     >
       <style>
         {`
-          @import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&display=swap');
           .transcript-scroll {
             scrollbar-width: thin;
             scrollbar-color: rgba(230, 230, 230, 0.9) rgba(20, 28, 40, 0.55);
@@ -1036,7 +1035,7 @@ export default function InterviewScreen() {
             </div>
             <span
               style={{
-                fontFamily: "'DM Mono', monospace",
+                fontFamily: "'Josefin Sans', sans-serif",
                 fontSize: '11px',
                 fontWeight: '600',
                 letterSpacing: '0.08em',
@@ -1054,7 +1053,7 @@ export default function InterviewScreen() {
                 background: 'rgba(99,102,241,0.1)',
                 border: '1px solid rgba(99,102,241,0.25)',
                 borderRadius: '999px',
-                fontFamily: "'DM Mono', monospace",
+                fontFamily: "'Josefin Sans', sans-serif",
                 fontSize: '11px',
                 fontWeight: '600',
                 letterSpacing: '0.06em',
@@ -1072,7 +1071,7 @@ export default function InterviewScreen() {
             fontSize: '1.08rem',
             fontWeight: 700,
             color: '#041018',
-            fontFamily: "'Unbounded', 'Space Grotesk', sans-serif",
+            fontFamily: "'Josefin Sans', sans-serif",
             background: 'linear-gradient(135deg, #f3f3f3 5%, #dcdcdc 52%, #b8b8b8 100%)',
             border: '1px solid rgba(255, 255, 255, 0.45)',
             borderRadius: '14px',
@@ -1201,7 +1200,7 @@ export default function InterviewScreen() {
             <p
               style={{
                 margin: 0,
-                fontFamily: "'Unbounded', 'Space Grotesk', sans-serif",
+                fontFamily: "'Josefin Sans', sans-serif",
                 fontSize: '1.15rem',
                 fontWeight: 700,
                 color: '#e2e8f0',
@@ -1416,7 +1415,7 @@ export default function InterviewScreen() {
                   />
                   <span
                     style={{
-                      fontFamily: "'DM Mono', monospace",
+                      fontFamily: "'Josefin Sans', sans-serif",
                       fontSize: '10px',
                       fontWeight: '600',
                       letterSpacing: '0.06em',
@@ -1528,7 +1527,7 @@ export default function InterviewScreen() {
                 />
                 <span
                   style={{
-                    fontFamily: "'Space Grotesk', sans-serif",
+                    fontFamily: "'Josefin Sans', sans-serif",
                     fontSize: '13px',
                     fontWeight: '600',
                     color: phase === 'transitioning' ? '#c4b5fd' : '#a5b4fc',
@@ -1641,7 +1640,7 @@ export default function InterviewScreen() {
             >
               <strong
                 style={{
-                  fontFamily: "'Unbounded', 'Space Grotesk', sans-serif",
+                  fontFamily: "'Josefin Sans', sans-serif",
                   fontSize: '0.85rem',
                   letterSpacing: '0.14em',
                   textTransform: 'uppercase',

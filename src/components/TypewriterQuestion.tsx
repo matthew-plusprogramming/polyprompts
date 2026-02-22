@@ -128,7 +128,7 @@ export default function TypewriterQuestion({
         />
         <span
           style={{
-            fontFamily: "'DM Mono', monospace",
+            fontFamily: "'Josefin Sans', sans-serif",
             fontSize: '10px',
             fontWeight: '700',
             letterSpacing: '0.12em',
@@ -145,7 +145,7 @@ export default function TypewriterQuestion({
       <p
         style={{
           margin: 0,
-          fontFamily: "'Syne', 'Space Grotesk', sans-serif",
+          fontFamily: "'Josefin Sans', sans-serif",
           fontSize: 'clamp(16px, 2.2vw, 22px)',
           fontWeight: 700,
           lineHeight: 1.55,
