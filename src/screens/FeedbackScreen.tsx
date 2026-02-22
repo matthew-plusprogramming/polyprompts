@@ -314,6 +314,26 @@ export default function FeedbackScreen() {
     };
   }, [feedbackResponse]);
 
+  // Prefetch all guided review TTS as soon as feedback arrives
+  useEffect(() => {
+    if (!feedbackResponse) return;
+    const questions = feedbackResponse.questions ?? [];
+    const overallData = feedbackResponse.overall;
+    if (!overallData || questions.length === 0) return;
+
+    const guidedSpeed = Math.min(4.0, state.ttsSpeed);
+    const introText = `Let's review your interview. You scored ${Math.round(overallData.score)}% overall. Let me walk you through each question.`;
+    const outroText = overallData.summary || 'That completes your interview review. Keep practicing!';
+    const allTexts = [introText];
+    for (const q of questions) {
+      if (q.best_part_explanation) allTexts.push(q.best_part_explanation);
+      if (q.worst_part_explanation) allTexts.push(q.worst_part_explanation);
+    }
+    allTexts.push(outroText);
+    log.info('Prefetching guided review TTS', { textCount: allTexts.length });
+    prefetchTTS(allTexts, state.ttsVoice, guidedSpeed);
+  }, [feedbackResponse, state.ttsSpeed, state.ttsVoice]);
+
   const getDimensionValue = (key: DimensionKey): number => {
     if (!overall) return 0;
     return (overall[key] ?? 0) / 100;

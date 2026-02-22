@@ -8,7 +8,7 @@ import { useFaceDetection } from '../hooks/useFaceDetection';
 import { analyzePause, prefetchTTS } from '../services/openai';
 import { getFeedback } from '../services/api';
 import { countFillers } from '../hooks/useFillerDetection';
-import type { QuestionResult } from '../types';
+import type { QuestionResult, FeedbackResponse, OverallFeedback } from '../types';
 import ParticleVisualizer from '../components/ParticleVisualizer';
 import TypewriterQuestion from '../components/TypewriterQuestion';
 import SilenceNudge from '../components/SilenceNudge';
@@ -80,6 +80,9 @@ export default function InterviewScreen() {
   stateRef.current = state;
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
+
+  // Background scoring: fire off per-question feedback calls as each answer completes
+  const backgroundScoringRef = useRef<Promise<FeedbackResponse>[]>([]);
 
   // ─── Video recording refs ───
   const videoRecorderRef = useRef<MediaRecorder | null>(null);
@@ -558,18 +561,45 @@ export default function InterviewScreen() {
       dispatch({ type: 'SAVE_QUESTION_RESULT', payload: questionResult });
 
       if (isLastQuestion) {
-        // Final question: batch score ALL questions at once
+        // Final question: score this question in background, then merge all results
         dispatch({ type: 'START_SCORING' });
         try {
-          // Collect all questions and answers (including the one we just saved)
-          const allResults = [...currentState.questionResults, questionResult];
-          const allQuestions = allResults.map(qr => qr.question.text);
-          const allAnswers = allResults.map(qr => qr.transcript);
-
-          const feedbackResponse = await getFeedback(allQuestions, allAnswers, {
+          const feedbackOpts = {
             resumeText: currentState.resumeText ?? undefined,
             jobDescription: currentState.jobDescription ?? undefined,
-          });
+          };
+
+          // Fire off scoring for the last question
+          const lastQuestionPromise = getFeedback([question.text], [transcript], feedbackOpts);
+          backgroundScoringRef.current.push(lastQuestionPromise);
+
+          // Wait for all per-question scoring to complete in parallel
+          const perQuestionResults = await Promise.all(backgroundScoringRef.current);
+          backgroundScoringRef.current = [];
+
+          // Merge per-question feedback into a single response
+          const allQuestionFeedback = perQuestionResults.flatMap(r => r.questions);
+          const avgScore = allQuestionFeedback.reduce((sum, q) => sum + q.score, 0) / allQuestionFeedback.length;
+
+          // Average category scores across all per-question overalls
+          const categoryKeys = ['response_organization', 'technical_knowledge', 'problem_solving', 'position_application', 'timing', 'personability'] as const;
+          const avgCategories = {} as Record<typeof categoryKeys[number], number>;
+          for (const key of categoryKeys) {
+            avgCategories[key] = Number((perQuestionResults.reduce((sum, r) => sum + (r.overall[key] ?? 0), 0) / perQuestionResults.length).toFixed(1));
+          }
+
+          const mergedOverall: OverallFeedback = {
+            ...avgCategories,
+            score: Number(avgScore.toFixed(1)),
+            what_went_well: perQuestionResults.map(r => r.overall.what_went_well).join(' '),
+            needs_improvement: perQuestionResults.map(r => r.overall.needs_improvement).join(' '),
+            summary: perQuestionResults.map(r => r.overall.summary).join(' '),
+          };
+
+          const feedbackResponse: FeedbackResponse = {
+            questions: allQuestionFeedback,
+            overall: mergedOverall,
+          };
 
           // Update each question result with its individual feedback
           feedbackResponse.questions.forEach((qFeedback, idx) => {
@@ -591,12 +621,25 @@ export default function InterviewScreen() {
           });
         } catch (err) {
           log.error('Scoring failed', { error: String(err) });
+          backgroundScoringRef.current = [];
         }
 
         log.info('Navigating to feedback');
         navigate('/feedback');
       } else {
-        // Non-final question: just advance to next (no per-question scoring)
+        // Non-final question: fire off background scoring for this question while user moves on
+        const feedbackOpts = {
+          resumeText: currentState.resumeText ?? undefined,
+          jobDescription: currentState.jobDescription ?? undefined,
+        };
+        log.info('Starting background scoring for question', { questionIndex: currentIdx });
+        backgroundScoringRef.current.push(
+          getFeedback([question.text], [transcript], feedbackOpts).catch(err => {
+            log.error('Background scoring failed for question', { questionIndex: currentIdx, error: String(err) });
+            throw err;
+          })
+        );
+
         finishingRef.current = false;
         await beginNextQuestionRef.current();
         return;
@@ -654,18 +697,17 @@ export default function InterviewScreen() {
     }
   }, [state.questions.length, state.currentQuestion, navigate]);
 
-  // Prefetch next question TTS during recording (safety net if SetupScreen prefetch didn't finish)
+  // Prefetch next question + transition/nudge TTS as early as possible (during question readout)
   useEffect(() => {
-    if (phase !== 'recording') return;
+    if (phase !== 'speaking-question' && phase !== 'recording') return;
     const nextIdx = state.currentQuestionIndex + 1;
     const nextQuestion = state.questions[nextIdx];
-    if (!nextQuestion) return;
 
     const texts = [
       "Great, let's move on to the next question.",
-      nextQuestion.text,
       "It sounds like you might be wrapping up. Are you finished with your answer, or would you like to continue?",
     ];
+    if (nextQuestion) texts.push(nextQuestion.text);
     prefetchTTS(texts, state.ttsVoice, state.ttsSpeed);
   }, [phase, state.currentQuestionIndex, state.questions, state.ttsVoice, state.ttsSpeed]);
 
