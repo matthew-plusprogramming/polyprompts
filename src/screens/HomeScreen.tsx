@@ -8,12 +8,13 @@ export default function HomeScreen() {
   return (
     <div
       style={{
-        height: '100vh',
+        height: '100dvh',
+        minHeight: '100dvh',
         color: '#f5f7ff',
         backgroundImage: `linear-gradient(180deg, rgba(0, 0, 0, 0.96) 0%, rgba(0, 0, 0, 0.86) 30%, rgba(0, 0, 0, 0.52) 52%, rgba(0, 0, 0, 0.16) 70%, rgba(0, 0, 0, 0) 82%), url(${homePageBg})`,
         backgroundColor: '#04050b',
         backgroundSize: '100% 100%, 100% auto',
-        backgroundPosition: 'center top, center 96%',
+        backgroundPosition: 'center top, center calc(100% + 15vh + 15px)',
         backgroundRepeat: 'no-repeat',
         overflow: 'hidden',
         position: 'relative',
@@ -73,7 +74,7 @@ export default function HomeScreen() {
         <section
           style={{
             textAlign: 'center',
-            marginTop: '0px',
+            marginTop: '100px',
             flex: '0 0 auto',
             width: 'min(760px, 82vw)',
             marginLeft: 'auto',
@@ -85,9 +86,10 @@ export default function HomeScreen() {
               margin: 0,
               fontFamily: "'Josefin Sans', sans-serif",
               fontSize: 'clamp(1.45rem, 2.9vw, 2.45rem)',
-              lineHeight: 1.16,
-              letterSpacing: '0.01em',
+              lineHeight: 1.22,
+              letterSpacing: '0.035em',
               color: '#f3f6ff',
+              fontWeight: 700,
             }}
           >
             Introducing <span style={{ color: '#c9f36b' }}>STARLY</span>, the
@@ -96,23 +98,26 @@ export default function HomeScreen() {
           </h1>
           <p
             style={{
-              margin: '14px auto 0',
+              margin: '18px auto 0',
               maxWidth: '640px',
               fontSize: 'clamp(0.82rem, 1.05vw, 1.15rem)',
               fontWeight: 600,
-              lineHeight: 1.28,
+              lineHeight: 1.34,
+              letterSpacing: '0.02em',
               color: 'rgba(245, 250, 255, 0.92)',
               fontFamily: "'Josefin Sans', sans-serif",
             }}
           >
-            Sharpen your Interview Performance with Real-Time Feedback
+            Sharpen your Interview Performance
+            <br />
+            <span style={{ display: 'inline-block', paddingLeft: '0.7em' }}>with Real-Time Feedback</span>
           </p>
 
           <button
             type="button"
             onClick={() => navigate('/setup')}
             style={{
-              marginTop: '16px',
+              marginTop: '22px',
               border: 'none',
               borderRadius: '14px',
               background: '#c9f36b',
