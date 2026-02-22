@@ -119,13 +119,13 @@ export default function PreInterviewScreen() {
         }
       }
 
-      setSubtitle(responseText);
-
-      // Play TTS
+      // Play TTS — show subtitle only once audio actually starts
       try {
-        await speak(responseText);
+        await speak(responseText, { onStart: () => setSubtitle(responseText) });
       } catch (err) {
         log.warn('TTS playback failed', { error: String(err) });
+        // Show text as fallback if TTS fails
+        setSubtitle(responseText);
       }
 
       // Advance past any echo text
@@ -137,11 +137,11 @@ export default function PreInterviewScreen() {
       if (nextIndex >= script.steps.length) {
         // All steps done — play completion message
         setPhase('completing');
-        setSubtitle(script.completionMessage);
         try {
-          await speak(script.completionMessage);
+          await speak(script.completionMessage, { onStart: () => setSubtitle(script.completionMessage) });
         } catch (err) {
           log.warn('Completion TTS failed', { error: String(err) });
+          setSubtitle(script.completionMessage);
         }
         navigate('/interview', { replace: true, state: { autoStart: true } });
       } else {
