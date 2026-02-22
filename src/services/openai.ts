@@ -18,7 +18,7 @@ async function getClient() {
 // --- TTS ---
 const ttsCache = new Map<string, Blob>();
 
-export async function textToSpeech(text: string, voice: string = 'alloy', speed: number = 1.0): Promise<Blob> {
+export async function textToSpeech(text: string, voice: string = 'marin', speed: number = 1.0): Promise<Blob> {
   const cacheKey = voice + ':' + speed + ':' + text;
   const cached = ttsCache.get(cacheKey);
   if (cached) {
@@ -29,7 +29,7 @@ export async function textToSpeech(text: string, voice: string = 'alloy', speed:
   const openai = await getClient();
   const response = await openai.audio.speech.create({
     model: 'tts-1',
-    voice: voice as 'alloy' | 'nova' | 'shimmer' | 'echo' | 'onyx' | 'fable',
+    voice: voice as 'alloy' | 'nova' | 'shimmer' | 'echo' | 'onyx' | 'fable' | 'marin',
     input: text,
     response_format: 'mp3',
     speed: Math.max(0.25, Math.min(4.0, speed)), // OpenAI TTS supports 0.25-4.0
@@ -41,7 +41,7 @@ export async function textToSpeech(text: string, voice: string = 'alloy', speed:
 }
 
 // --- TTS Prefetch ---
-export function prefetchTTS(texts: string[], voice: string = 'alloy', speed: number = 1.0): void {
+export function prefetchTTS(texts: string[], voice: string = 'marin', speed: number = 1.0): void {
   for (const text of texts) {
     textToSpeech(text, voice, speed).catch((err) => {
       log.warn('TTS prefetch failed', { text: text.slice(0, 40), error: String(err) });
