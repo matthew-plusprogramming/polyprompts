@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useInterview } from '../context/InterviewContext';
 import { loadQuestions } from '../services/questionLoader';
 import { prefetchTTS } from '../services/openai';
+import { getPreInterviewPrefetchTexts } from '../config/preInterviewScript';
 import type { Difficulty, Role } from '../types';
 import { createLogger } from '../utils/logger';
 
@@ -1250,7 +1251,9 @@ export default function SetupScreen() {
       } else {
         log.warn('No questions matched filters', { role: mappedRole, difficulty, category });
       }
-      navigate('/interview');
+      // Prefetch pre-interview script TTS alongside question TTS
+      prefetchTTS(getPreInterviewPrefetchTexts());
+      navigate('/pre-interview');
     } catch (err) {
       console.error('[SetupScreen] Failed to load questions:', err);
       setLaunching(false);
