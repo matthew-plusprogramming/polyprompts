@@ -29,7 +29,7 @@ const initialState: InterviewState = {
   resumeText: null,
   jobDescription: null,
   sessionHistory: [],
-  ttsVoice: 'alloy',
+  ttsVoice: 'marin',
   ttsSpeed: 1.05,
   voiceSummary: null,
 };

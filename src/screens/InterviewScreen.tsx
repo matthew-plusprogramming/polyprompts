@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useInterview } from '../context/InterviewContext';
 import { useTTS } from '../hooks/useTTS';
 import { useDeepgramTranscription } from '../hooks/useDeepgramTranscription';
@@ -35,6 +35,7 @@ type ScreenPhase =
 export default function InterviewScreen() {
   const { state, dispatch } = useInterview();
   const navigate = useNavigate();
+  const location = useLocation();
   const { speak, stopPlayback, isPlaying: ttsPlaying, analyserNode: ttsAnalyserNode } = useTTS();
   const deepgram = useDeepgramTranscription();
 
@@ -412,6 +413,20 @@ export default function InterviewScreen() {
       void faceDetection.start();
     }
   };
+
+  // ─── Auto-start after pre-interview script completes ───
+  const autoStartedRef = useRef(false);
+  useEffect(() => {
+    if (
+      (location.state as { autoStart?: boolean })?.autoStart &&
+      !autoStartedRef.current &&
+      phase === 'ready' &&
+      state.currentQuestion
+    ) {
+      autoStartedRef.current = true;
+      void handleStart();
+    }
+  }, [location.state, phase, state.currentQuestion]);
 
   // ─── beginNextQuestion: TTS transition + start recording for next question ───
   const beginNextQuestion = async () => {

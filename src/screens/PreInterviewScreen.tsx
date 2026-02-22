@@ -143,7 +143,7 @@ export default function PreInterviewScreen() {
         } catch (err) {
           log.warn('Completion TTS failed', { error: String(err) });
         }
-        navigate('/interview', { replace: true });
+        navigate('/interview', { replace: true, state: { autoStart: true } });
       } else {
         setStepIndex(nextIndex);
         setPhase('listening');
