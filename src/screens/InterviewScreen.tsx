@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useInterview } from '../context/InterviewContext';
 import { useTTS } from '../hooks/useTTS';
 import { useDeepgramTranscription } from '../hooks/useDeepgramTranscription';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useFaceDetection } from '../hooks/useFaceDetection';
-import { analyzePause, prefetchTTS } from '../services/openai';
+import { analyzePause, prefetchTTS, generateVoiceSummary } from '../services/openai';
 import { getFeedback } from '../services/api';
 import { countFillers } from '../hooks/useFillerDetection';
-import type { QuestionResult } from '../types';
+import type { QuestionResult, FeedbackResponse, OverallFeedback } from '../types';
 import ParticleVisualizer from '../components/ParticleVisualizer';
 import TypewriterQuestion from '../components/TypewriterQuestion';
 import SilenceNudge from '../components/SilenceNudge';
@@ -35,6 +35,7 @@ type ScreenPhase =
 export default function InterviewScreen() {
   const { state, dispatch } = useInterview();
   const navigate = useNavigate();
+  const location = useLocation();
   const { speak, stopPlayback, isPlaying: ttsPlaying, analyserNode: ttsAnalyserNode } = useTTS();
   const deepgram = useDeepgramTranscription();
 
@@ -80,6 +81,9 @@ export default function InterviewScreen() {
   stateRef.current = state;
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
+
+  // Background scoring: fire off per-question feedback calls as each answer completes
+  const backgroundScoringRef = useRef<Promise<FeedbackResponse>[]>([]);
 
   // ─── Video recording refs ───
   const videoRecorderRef = useRef<MediaRecorder | null>(null);
@@ -297,9 +301,9 @@ export default function InterviewScreen() {
       // Default: verbally ask the user if they're finished
       setPhase('silence-detected');
       setStatusText('Waiting for you...');
-      setSilenceMessage("Are you finished with your answer? Press Space when you're done.");
+      setSilenceMessage("Are you finished? Press Space when you're done.");
       try {
-        await speakRef.current("It sounds like you might be wrapping up. Are you finished with your answer, or would you like to continue?", stateRef.current.ttsVoice, stateRef.current.ttsSpeed);
+        await speakRef.current("Are you finished, or would you like to keep going?", stateRef.current.ttsVoice, stateRef.current.ttsSpeed);
       } catch (e) {
         log.warn('TTS nudge failed', { error: String(e) });
       }
@@ -409,6 +413,20 @@ export default function InterviewScreen() {
       void faceDetection.start();
     }
   };
+
+  // ─── Auto-start after pre-interview script completes ───
+  const autoStartedRef = useRef(false);
+  useEffect(() => {
+    if (
+      (location.state as { autoStart?: boolean })?.autoStart &&
+      !autoStartedRef.current &&
+      phase === 'ready' &&
+      state.currentQuestion
+    ) {
+      autoStartedRef.current = true;
+      void handleStart();
+    }
+  }, [location.state, phase, state.currentQuestion]);
 
   // ─── beginNextQuestion: TTS transition + start recording for next question ───
   const beginNextQuestion = async () => {
@@ -558,15 +576,45 @@ export default function InterviewScreen() {
       dispatch({ type: 'SAVE_QUESTION_RESULT', payload: questionResult });
 
       if (isLastQuestion) {
-        // Final question: batch score ALL questions at once
+        // Final question: score this question in background, then merge all results
         dispatch({ type: 'START_SCORING' });
         try {
-          // Collect all questions and answers (including the one we just saved)
-          const allResults = [...currentState.questionResults, questionResult];
-          const allQuestions = allResults.map(qr => qr.question.text);
-          const allAnswers = allResults.map(qr => qr.transcript);
+          const feedbackOpts = {
+            resumeText: currentState.resumeText ?? undefined,
+            jobDescription: currentState.jobDescription ?? undefined,
+          };
 
-          const feedbackResponse = await getFeedback(allQuestions, allAnswers);
+          // Fire off scoring for the last question
+          const lastQuestionPromise = getFeedback([question.text], [transcript], feedbackOpts);
+          backgroundScoringRef.current.push(lastQuestionPromise);
+
+          // Wait for all per-question scoring to complete in parallel
+          const perQuestionResults = await Promise.all(backgroundScoringRef.current);
+          backgroundScoringRef.current = [];
+
+          // Merge per-question feedback into a single response
+          const allQuestionFeedback = perQuestionResults.flatMap(r => r.questions);
+          const avgScore = allQuestionFeedback.reduce((sum, q) => sum + q.score, 0) / allQuestionFeedback.length;
+
+          // Average category scores across all per-question overalls
+          const categoryKeys = ['response_organization', 'technical_knowledge', 'problem_solving', 'position_application', 'timing', 'personability'] as const;
+          const avgCategories = {} as Record<typeof categoryKeys[number], number>;
+          for (const key of categoryKeys) {
+            avgCategories[key] = Number((perQuestionResults.reduce((sum, r) => sum + (r.overall[key] ?? 0), 0) / perQuestionResults.length).toFixed(1));
+          }
+
+          const mergedOverall: OverallFeedback = {
+            ...avgCategories,
+            score: Number(avgScore.toFixed(1)),
+            what_went_well: perQuestionResults.map(r => r.overall.what_went_well).join(' '),
+            needs_improvement: perQuestionResults.map(r => r.overall.needs_improvement).join(' '),
+            summary: perQuestionResults.map(r => r.overall.summary).join(' '),
+          };
+
+          const feedbackResponse: FeedbackResponse = {
+            questions: allQuestionFeedback,
+            overall: mergedOverall,
+          };
 
           // Update each question result with its individual feedback
           feedbackResponse.questions.forEach((qFeedback, idx) => {
@@ -586,14 +634,38 @@ export default function InterviewScreen() {
               createdAt: new Date().toISOString(),
             },
           });
+
+          // Fire voice summary generation + TTS prefetch in background (non-blocking)
+          generateVoiceSummary(feedbackResponse)
+            .then((summaryText) => {
+              prefetchTTS([summaryText], currentState.ttsVoice, currentState.ttsSpeed);
+              dispatch({ type: 'SET_VOICE_SUMMARY', payload: summaryText });
+              log.info('Voice summary ready', { length: summaryText.length });
+            })
+            .catch((err) => {
+              log.warn('Voice summary generation failed', { error: String(err) });
+            });
         } catch (err) {
           log.error('Scoring failed', { error: String(err) });
+          backgroundScoringRef.current = [];
         }
 
         log.info('Navigating to feedback');
         navigate('/feedback');
       } else {
-        // Non-final question: just advance to next (no per-question scoring)
+        // Non-final question: fire off background scoring for this question while user moves on
+        const feedbackOpts = {
+          resumeText: currentState.resumeText ?? undefined,
+          jobDescription: currentState.jobDescription ?? undefined,
+        };
+        log.info('Starting background scoring for question', { questionIndex: currentIdx });
+        backgroundScoringRef.current.push(
+          getFeedback([question.text], [transcript], feedbackOpts).catch(err => {
+            log.error('Background scoring failed for question', { questionIndex: currentIdx, error: String(err) });
+            throw err;
+          })
+        );
+
         finishingRef.current = false;
         await beginNextQuestionRef.current();
         return;
@@ -651,18 +723,17 @@ export default function InterviewScreen() {
     }
   }, [state.questions.length, state.currentQuestion, navigate]);
 
-  // Prefetch next question TTS during recording (safety net if SetupScreen prefetch didn't finish)
+  // Prefetch next question + transition/nudge TTS as early as possible (during question readout)
   useEffect(() => {
-    if (phase !== 'recording') return;
+    if (phase !== 'speaking-question' && phase !== 'recording') return;
     const nextIdx = state.currentQuestionIndex + 1;
     const nextQuestion = state.questions[nextIdx];
-    if (!nextQuestion) return;
 
     const texts = [
       "Great, let's move on to the next question.",
-      nextQuestion.text,
-      "It sounds like you might be wrapping up. Are you finished with your answer, or would you like to continue?",
+      "Are you finished, or would you like to keep going?",
     ];
+    if (nextQuestion) texts.push(nextQuestion.text);
     prefetchTTS(texts, state.ttsVoice, state.ttsSpeed);
   }, [phase, state.currentQuestionIndex, state.questions, state.ttsVoice, state.ttsSpeed]);
 
@@ -865,8 +936,8 @@ export default function InterviewScreen() {
           }
           @keyframes btn-shimmer-anim { 0% { left: -100%; } 60%, 100% { left: 150%; } }
           @keyframes starlyFlow {
-            0% { transform: translate(-50%, -50%) rotate(0deg); }
-            100% { transform: translate(-50%, -50%) rotate(360deg); }
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.06); }
           }
           @keyframes starlyGlow {
             0%, 100% { filter: invert(1) brightness(1.25) drop-shadow(0 0 12px rgba(255, 255, 255, 0.4)) drop-shadow(0 0 26px rgba(180, 210, 255, 0.25)); }
@@ -1412,8 +1483,7 @@ export default function InterviewScreen() {
                     backfaceVisibility: 'hidden',
                     willChange: 'transform, filter, opacity',
                     transition: 'opacity 160ms linear, filter 180ms linear',
-                    animation: 'starlyFlow 7.2s linear infinite, starlyGlow 1.8s ease-in-out infinite',
-                    animationPlayState: visualizerSpeaking ? 'running' : 'paused',
+                    animation: 'starlyFlow 3s ease-in-out infinite, starlyGlow 1.8s ease-in-out infinite',
                     animationFillMode: 'both',
                   }}
                 />
@@ -1436,7 +1506,7 @@ export default function InterviewScreen() {
 
           {/* Status banner — container always visible for stable layout, content fades */}
           {(() => {
-            const active = phase === 'thinking' || phase === 'transitioning';
+            const active = phase === 'thinking';
             return (
               <div
                 style={{

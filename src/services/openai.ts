@@ -18,8 +18,8 @@ async function getClient() {
 // --- TTS ---
 const ttsCache = new Map<string, Blob>();
 
-export async function textToSpeech(text: string, voice: string = 'alloy', speed: number = 1.0): Promise<Blob> {
-  const cacheKey = voice + ':' + speed + ':' + text;
+export async function textToSpeech(text: string, voice: string = 'marin', speed: number = 1.0, instructions?: string): Promise<Blob> {
+  const cacheKey = voice + ':' + speed + ':' + (instructions ?? '') + ':' + text;
   const cached = ttsCache.get(cacheKey);
   if (cached) {
     log.debug('TTS cache hit', { voice, speed });
@@ -28,9 +28,10 @@ export async function textToSpeech(text: string, voice: string = 'alloy', speed:
 
   const openai = await getClient();
   const response = await openai.audio.speech.create({
-    model: 'tts-1',
-    voice: voice as 'alloy' | 'nova' | 'shimmer' | 'echo' | 'onyx' | 'fable',
+    model: 'gpt-4o-mini-tts-2025-12-15',
+    voice: voice as 'alloy' | 'nova' | 'shimmer' | 'echo' | 'onyx' | 'fable' | 'marin',
     input: text,
+    instructions: instructions ?? 'Casual American female voice. Relaxed, steady pacing with natural micro-pauses between phrases. Slight upward inflection when asking questions. No vocal fry. Do not sound like a narrator or announcer — sound like a real person talking across a table.',
     response_format: 'mp3',
     speed: Math.max(0.25, Math.min(4.0, speed)), // OpenAI TTS supports 0.25-4.0
   });
@@ -41,15 +42,63 @@ export async function textToSpeech(text: string, voice: string = 'alloy', speed:
 }
 
 // --- TTS Prefetch ---
-export function prefetchTTS(texts: string[], voice: string = 'alloy', speed: number = 1.0): void {
+export function prefetchTTS(texts: string[], voice: string = 'marin', speed: number = 1.0, instructions?: string): void {
   for (const text of texts) {
-    textToSpeech(text, voice, speed).catch((err) => {
+    textToSpeech(text, voice, speed, instructions).catch((err) => {
       log.warn('TTS prefetch failed', { text: text.slice(0, 40), error: String(err) });
     });
   }
 }
 
-// --- Pause Analysis ---
+// --- Script Response (Pre-Interview) --- via Groq serverless
+export async function generateScriptResponse(
+  systemPrompt: string,
+  directive: string,
+  conversationContext?: string,
+): Promise<string> {
+  const stopTimer = log.time('generateScriptResponse');
+
+  const response = await fetch('/api/script', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ systemPrompt, directive, conversationContext }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Script generation failed');
+  }
+
+  const data = await response.json();
+  const text = data.text ?? '';
+  stopTimer();
+  log.info('Script response generated', { length: text.length });
+  return text;
+}
+
+// --- Voice Summary (post-interview debrief) --- via Groq serverless
+export async function generateVoiceSummary(feedback: import('../types').FeedbackResponse): Promise<string> {
+  const stopTimer = log.time('generateVoiceSummary');
+
+  const response = await fetch('/api/voice-summary', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ overall: feedback.overall, questions: feedback.questions }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Voice summary failed');
+  }
+
+  const data = await response.json();
+  const text = data.text ?? '';
+  stopTimer();
+  log.info('Voice summary generated', { length: text.length });
+  return text;
+}
+
+// --- Pause Analysis --- via Groq serverless
 // Returns:
 //   'definitely_done'          — auto-submit the answer (extremely high confidence)
 //   'definitely_still_talking' — stay silent, don't interrupt (extremely high confidence)
@@ -57,53 +106,20 @@ export function prefetchTTS(texts: string[], voice: string = 'alloy', speed: num
 export async function analyzePause(transcript: string): Promise<'definitely_done' | 'definitely_still_talking' | 'ask'> {
   const stopTimer = log.time('analyzePause');
   log.info('analyzePause called', { transcriptLength: transcript.length });
-  const openai = await getClient();
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    temperature: 0,
-    max_tokens: 20,
-    messages: [
-      {
-        role: 'system',
-        content: `You analyze an interview candidate's transcript after they paused. Decide what to do next.
 
-Return "definitely_done" if you are ~70-80% confident the candidate has finished their answer. This includes:
-- The candidate explicitly signals they are finished (e.g. "I'm done", "that's it", "that's all", "that's my answer", "yeah that's about it", "I think that covers it")
-- The answer has a concluding statement (wrapping up with a result, lesson learned, or summary) AND covers reasonable ground (30+ words)
-- The candidate has addressed the question and their last sentence feels like a natural stopping point
-- The transcript trails off after making a complete point, even without an explicit wrap-up
-
-Return "definitely_still_talking" ONLY if you are confident the candidate is mid-thought:
-- The transcript ends mid-sentence with an incomplete clause
-- The last word is a conjunction or preposition (and, but, so, because, like, with, to, for, that, which)
-- The transcript is very short (under 15 words) and clearly just getting started
-
-Return "ask" when genuinely uncertain. But prefer "definitely_done" over "ask" if the answer seems substantially complete.`,
-      },
-      {
-        role: 'user',
-        content: `Transcript so far: "${transcript}"`,
-      },
-    ],
-    response_format: {
-      type: 'json_schema',
-      json_schema: {
-        name: 'pause_analysis',
-        strict: true,
-        schema: {
-          type: 'object' as const,
-          properties: {
-            verdict: { type: 'string' as const, enum: ['definitely_done', 'definitely_still_talking', 'ask'] },
-          },
-          required: ['verdict'],
-          additionalProperties: false,
-        },
-      },
-    },
+  const response = await fetch('/api/pause', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ transcript }),
   });
 
-  const parsed = JSON.parse(response.choices[0]?.message?.content ?? '{}');
-  const verdict = parsed.verdict;
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Pause analysis failed');
+  }
+
+  const data = await response.json();
+  const verdict = data.verdict;
   stopTimer();
   log.info('analyzePause verdict', { verdict });
   if (verdict === 'definitely_done') return 'definitely_done';

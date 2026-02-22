@@ -26,9 +26,12 @@ const initialState: InterviewState = {
   speakingDurationSeconds: 0,
   totalDurationSeconds: 0,
   resumeData: null,
+  resumeText: null,
+  jobDescription: null,
   sessionHistory: [],
-  ttsVoice: 'alloy',
-  ttsSpeed: 1.05,
+  ttsVoice: 'marin',
+  ttsSpeed: 1.0,
+  voiceSummary: null,
 };
 
 function interviewReducer(state: InterviewState, action: InterviewAction): InterviewState {
@@ -80,6 +83,10 @@ function interviewReducer(state: InterviewState, action: InterviewAction): Inter
     }
     case 'SET_RESUME_DATA':
       return { ...state, resumeData: action.payload };
+    case 'SET_RESUME_TEXT':
+      return { ...state, resumeText: action.payload };
+    case 'SET_JOB_DESCRIPTION':
+      return { ...state, jobDescription: action.payload };
     case 'START_RECORDING':
       return { ...state, isRecording: true, liveTranscript: '', audioBlob: null };
     case 'STOP_RECORDING':
@@ -94,6 +101,8 @@ function interviewReducer(state: InterviewState, action: InterviewAction): Inter
       return { ...state, isScoring: false, feedbackResponse: action.payload };
     case 'SET_TOTAL_DURATION':
       return { ...state, totalDurationSeconds: action.payload };
+    case 'SET_VOICE_SUMMARY':
+      return { ...state, voiceSummary: action.payload };
     case 'RETRY':
       return {
         ...state,
@@ -105,6 +114,7 @@ function interviewReducer(state: InterviewState, action: InterviewAction): Inter
         audioBlob: null,
         isScoring: false,
         feedbackResponse: null,
+        voiceSummary: null,
         previousAttempts: state.feedbackResponse
           ? [...state.previousAttempts, state.feedbackResponse]
           : state.previousAttempts,
@@ -118,7 +128,7 @@ function interviewReducer(state: InterviewState, action: InterviewAction): Inter
     case 'SET_TTS_SPEED':
       return { ...state, ttsSpeed: action.payload };
     case 'NEXT_QUESTION':
-      return { ...initialState, role: state.role, difficulty: state.difficulty, resumeData: state.resumeData, sessionHistory: state.sessionHistory, ttsVoice: state.ttsVoice, ttsSpeed: state.ttsSpeed };
+      return { ...initialState, role: state.role, difficulty: state.difficulty, resumeData: state.resumeData, resumeText: state.resumeText, jobDescription: state.jobDescription, sessionHistory: state.sessionHistory, ttsVoice: state.ttsVoice, ttsSpeed: state.ttsSpeed };
     case 'SAVE_SESSION':
       return { ...state, sessionHistory: [...state.sessionHistory, action.payload] };
     default:

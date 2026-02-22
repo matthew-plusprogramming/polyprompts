@@ -16,6 +16,12 @@ export interface ResumeData {
   education: string;
 }
 
+export interface ResumeQuestionMeta {
+  question: string;
+  type: string;
+  focus: string;
+}
+
 export interface Question {
   id: string;
   text: string;
@@ -105,9 +111,12 @@ export interface InterviewState {
   speakingDurationSeconds: number;
   totalDurationSeconds: number;
   resumeData: ResumeData | null;
+  resumeText: string | null;
+  jobDescription: string | null;
   sessionHistory: Session[];
   ttsVoice: string;
   ttsSpeed: number;
+  voiceSummary: string | null;
 }
 
 export type InterviewAction =
@@ -119,6 +128,8 @@ export type InterviewAction =
   | { type: 'UPDATE_QUESTION_FEEDBACK'; payload: { index: number; feedback: QuestionFeedback } }
   | { type: 'ADVANCE_QUESTION' }
   | { type: 'SET_RESUME_DATA'; payload: ResumeData }
+  | { type: 'SET_RESUME_TEXT'; payload: string }
+  | { type: 'SET_JOB_DESCRIPTION'; payload: string }
   | { type: 'START_RECORDING' }
   | { type: 'STOP_RECORDING'; payload: Blob }
   | { type: 'UPDATE_TRANSCRIPT'; payload: string }
@@ -130,4 +141,5 @@ export type InterviewAction =
   | { type: 'NEXT_QUESTION' }
   | { type: 'SAVE_SESSION'; payload: Session }
   | { type: 'SET_TTS_VOICE'; payload: string }
-  | { type: 'SET_TTS_SPEED'; payload: number };
+  | { type: 'SET_TTS_SPEED'; payload: number }
+  | { type: 'SET_VOICE_SUMMARY'; payload: string };

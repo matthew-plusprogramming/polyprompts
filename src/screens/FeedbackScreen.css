@@ -565,6 +565,49 @@
   }
 }
 
+/* ── Voice summary speaker indicator ── */
+
+.voice-summary-indicator {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  padding: 0 4px;
+  animation: fadeIn 0.3s ease;
+}
+
+.voice-summary-indicator__bar {
+  width: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  animation: voiceBar 0.8s ease-in-out infinite;
+}
+
+.voice-summary-indicator__bar:nth-child(1) {
+  height: 8px;
+  animation-delay: 0s;
+}
+
+.voice-summary-indicator__bar:nth-child(2) {
+  height: 14px;
+  animation-delay: 0.15s;
+}
+
+.voice-summary-indicator__bar:nth-child(3) {
+  height: 10px;
+  animation-delay: 0.3s;
+}
+
+@keyframes voiceBar {
+  0%, 100% { transform: scaleY(0.4); opacity: 0.5; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 @keyframes starTwinkle {
   0% {
     opacity: 0.22;

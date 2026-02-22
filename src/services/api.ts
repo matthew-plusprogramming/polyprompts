@@ -25,15 +25,44 @@ export async function generateQuestion(
   return data.question;
 }
 
+export async function generateResumeQuestion(
+  resumeText: string,
+  jobDescription: string,
+  questionNumber: number,
+  previousQuestions: string[],
+): Promise<{ question: string; type: string; focus: string }> {
+  const stopTimer = log.time('generateResumeQuestion');
+  const res = await fetch('/api/resume-question', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ resumeText, jobDescription, questionNumber, previousQuestions }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(err.error || `Resume question generation failed (${res.status})`);
+  }
+
+  const data = await res.json();
+  stopTimer();
+  return data;
+}
+
 export async function getFeedback(
   questions: string[],
   answers: string[],
+  opts?: { resumeText?: string; jobDescription?: string },
 ): Promise<FeedbackResponse> {
   const stopTimer = log.time('getFeedback');
   const res = await fetch('/api/feedback', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ questions, answers }),
+    body: JSON.stringify({
+      questions,
+      answers,
+      ...(opts?.resumeText ? { resumeText: opts.resumeText } : {}),
+      ...(opts?.jobDescription ? { jobDescription: opts.jobDescription } : {}),
+    }),
   });
 
   if (!res.ok) {
