@@ -634,7 +634,7 @@ export default function FeedbackScreen() {
                       type="button"
                       className="feedback__review-toggle"
                       onClick={() => void runGuidedReview()}
-                      style={{ borderColor: 'rgba(129,140,248,0.4)', color: '#a5b4fc' }}
+                      style={{ borderColor: 'rgba(209,213,219,0.4)', color: '#d1d5db' }}
                     >
                       Guided Review
                     </button>
