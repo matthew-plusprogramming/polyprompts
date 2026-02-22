@@ -30,7 +30,7 @@ export const defaultScript: PreInterviewScript = {
       trigger: "I'm ready",
       triggerAliases: ['Yes', 'Ready', "Let's go", "Let's do it", 'Yeah', 'Yep', 'Sure', "We're ready"],
       response: [
-        "Love the energy! I'll ask you a couple behavioral questions — just use the STAR framework: Situation, Task, Action, Result.",
+        "Love the energy! I'll ask you a couple behavioral questions — just use the STAR framework.",
         "Take your time, there's no rush. Let's do this!",
       ],
     },
