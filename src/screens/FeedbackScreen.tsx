@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInterview } from "../context/InterviewContext";
 import { factCheck } from "../services/api";
+import { findQuoteTimeRange } from "../utils/quoteTimestamps";
 import type { FactCheckResult, FaceMetrics } from "../types";
 import "./FeedbackScreen.css";
 import { createLogger } from "../utils/logger";
@@ -53,6 +54,46 @@ export default function FeedbackScreen() {
       headStability: Math.round(sum.headStability / n),
       nervousnessScore: Math.round(sum.nervousnessScore / n),
       confidenceScore: Math.round(sum.confidenceScore / n),
+    };
+  }, [questionResults]);
+
+  // ─── Video blob URL management ───
+  const [videoBlobUrls, setVideoBlobUrls] = useState<Record<number, string>>({});
+  const [playingVideoIdx, setPlayingVideoIdx] = useState<number | null>(null);
+
+  // ─── Clip playback state ───
+  const [clipRange, setClipRange] = useState<{ idx: number; start: number; end: number } | null>(null);
+  const videoRefs = useRef<Record<number, HTMLVideoElement | null>>({});
+
+  const handlePlayClip = useCallback((questionIdx: number, quote: string) => {
+    const qr = questionResults[questionIdx];
+    if (!qr?.wordTimestamps?.length) return;
+
+    const range = findQuoteTimeRange(quote, qr.wordTimestamps);
+    if (!range) {
+      log.warn('No matching time range for quote', { questionIdx, quote: quote.slice(0, 50) });
+      return;
+    }
+
+    const video = videoRefs.current[questionIdx];
+    if (!video) return;
+
+    setClipRange({ idx: questionIdx, start: range.start, end: range.end });
+    video.currentTime = range.start;
+    void video.play();
+  }, [questionResults]);
+
+  useEffect(() => {
+    const urls: Record<number, string> = {};
+    questionResults.forEach((qr, idx) => {
+      if (qr.videoBlob) {
+        urls[idx] = URL.createObjectURL(qr.videoBlob);
+      }
+    });
+    setVideoBlobUrls(urls);
+
+    return () => {
+      Object.values(urls).forEach((url) => URL.revokeObjectURL(url));
     };
   }, [questionResults]);
 
@@ -369,6 +410,75 @@ export default function FeedbackScreen() {
                           <span>Your Response</span>
                           <p>{qr.transcript || "Response will appear after recording."}</p>
                         </div>
+                        {videoBlobUrls[idx] && (
+                          <div style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden' }}>
+                            <video
+                              ref={(el) => { videoRefs.current[idx] = el; }}
+                              src={videoBlobUrls[idx]}
+                              controls
+                              playsInline
+                              onPlay={() => setPlayingVideoIdx(idx)}
+                              onPause={() => setPlayingVideoIdx((prev) => prev === idx ? null : prev)}
+                              onEnded={() => {
+                                setPlayingVideoIdx((prev) => prev === idx ? null : prev);
+                                setClipRange((prev) => prev?.idx === idx ? null : prev);
+                              }}
+                              onTimeUpdate={(e) => {
+                                if (clipRange && clipRange.idx === idx) {
+                                  const video = e.currentTarget;
+                                  if (video.currentTime >= clipRange.end) {
+                                    video.pause();
+                                    setClipRange(null);
+                                  }
+                                }
+                              }}
+                              onSeeked={(e) => {
+                                if (clipRange && clipRange.idx === idx) {
+                                  const t = e.currentTarget.currentTime;
+                                  if (t < clipRange.start - 0.5 || t > clipRange.end + 0.5) {
+                                    setClipRange(null);
+                                  }
+                                }
+                              }}
+                              style={{
+                                width: '100%',
+                                maxHeight: '300px',
+                                borderRadius: '10px',
+                                transform: 'scaleX(-1)',
+                                background: '#000',
+                              }}
+                            />
+                            {playingVideoIdx === idx && qFeedback && (
+                              <div style={{
+                                position: 'absolute',
+                                bottom: '40px',
+                                left: '8px',
+                                right: '8px',
+                                padding: '0.6rem 0.8rem',
+                                borderRadius: '8px',
+                                background: 'rgba(0, 0, 0, 0.75)',
+                                backdropFilter: 'blur(6px)',
+                                pointerEvents: 'none',
+                              }}>
+                                {qFeedback.what_went_well && (
+                                  <p style={{ margin: '0 0 0.25rem', fontSize: '0.7rem', color: '#4ade80' }}>
+                                    <strong>Well done:</strong> {qFeedback.what_went_well}
+                                  </p>
+                                )}
+                                {qFeedback.needs_improvement && (
+                                  <p style={{ margin: '0 0 0.25rem', fontSize: '0.7rem', color: '#fbbf24' }}>
+                                    <strong>Improve:</strong> {qFeedback.needs_improvement}
+                                  </p>
+                                )}
+                                {qFeedback.best_part_quote && (
+                                  <p style={{ margin: 0, fontSize: '0.65rem', color: '#a7f3d0', fontStyle: 'italic' }}>
+                                    &ldquo;{qFeedback.best_part_quote}&rdquo;
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
                         {qFeedback && (
                           <div style={{
                             display: 'flex',
@@ -406,14 +516,62 @@ export default function FeedbackScreen() {
                             </p>
                             {qFeedback.best_part_quote && (
                               <div style={{ padding: '0.5rem', borderRadius: '8px', background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)' }}>
-                                <span style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: '#34d399', display: 'block', marginBottom: '0.25rem' }}>Best Part</span>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                                  <span style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: '#34d399' }}>Best Part</span>
+                                  {qr.wordTimestamps?.length && videoBlobUrls[idx] && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handlePlayClip(idx, qFeedback.best_part_quote)}
+                                      style={{
+                                        padding: '2px 10px',
+                                        borderRadius: '999px',
+                                        border: '1px solid rgba(52,211,153,0.3)',
+                                        background: clipRange?.idx === idx
+                                          ? 'rgba(52,211,153,0.2)'
+                                          : 'rgba(52,211,153,0.08)',
+                                        color: '#34d399',
+                                        fontSize: '0.58rem',
+                                        fontWeight: '600',
+                                        letterSpacing: '0.04em',
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                    >
+                                      Play Best Part
+                                    </button>
+                                  )}
+                                </div>
                                 <p style={{ margin: 0, fontSize: '0.75rem', color: '#a7f3d0', fontStyle: 'italic' }}>"{qFeedback.best_part_quote}"</p>
                                 <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: '#9ca3af' }}>{qFeedback.best_part_explanation}</p>
                               </div>
                             )}
                             {qFeedback.worst_part_quote && (
                               <div style={{ padding: '0.5rem', borderRadius: '8px', background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.15)' }}>
-                                <span style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: '#f87171', display: 'block', marginBottom: '0.25rem' }}>Needs Work</span>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                                  <span style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: '#f87171' }}>Needs Work</span>
+                                  {qr.wordTimestamps?.length && videoBlobUrls[idx] && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handlePlayClip(idx, qFeedback.worst_part_quote)}
+                                      style={{
+                                        padding: '2px 10px',
+                                        borderRadius: '999px',
+                                        border: '1px solid rgba(248,113,113,0.3)',
+                                        background: clipRange?.idx === idx
+                                          ? 'rgba(248,113,113,0.2)'
+                                          : 'rgba(248,113,113,0.08)',
+                                        color: '#f87171',
+                                        fontSize: '0.58rem',
+                                        fontWeight: '600',
+                                        letterSpacing: '0.04em',
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                    >
+                                      Play Worst Part
+                                    </button>
+                                  )}
+                                </div>
                                 <p style={{ margin: 0, fontSize: '0.75rem', color: '#fca5a5', fontStyle: 'italic' }}>"{qFeedback.worst_part_quote}"</p>
                                 <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: '#9ca3af' }}>{qFeedback.worst_part_explanation}</p>
                               </div>

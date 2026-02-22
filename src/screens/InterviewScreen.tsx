@@ -81,11 +81,91 @@ export default function InterviewScreen() {
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
 
+  // ─── Video recording refs ───
+  const videoRecorderRef = useRef<MediaRecorder | null>(null);
+  const videoChunksRef = useRef<Blob[]>([]);
+  const videoRecordingStartRef = useRef<number>(0);
+  const videoAudioTrackRef = useRef<MediaStreamTrack | null>(null);
+
   const clearSilenceTimer = useCallback(() => {
     if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
     }
+  }, []);
+
+  // ─── Video recording helpers ───
+  const startVideoRecording = useCallback((micStream: MediaStream) => {
+    const videoTrack = streamRef.current?.getVideoTracks()[0];
+    if (!videoTrack || !cameraEnabled) {
+      log.warn('startVideoRecording: no video track or camera disabled — skipping');
+      return;
+    }
+
+    const audioTrack = micStream.getAudioTracks()[0];
+    if (!audioTrack) {
+      log.warn('startVideoRecording: no audio track on micStream — skipping');
+      return;
+    }
+
+    const clonedAudio = audioTrack.clone();
+    videoAudioTrackRef.current = clonedAudio;
+
+    const combinedStream = new MediaStream([videoTrack, clonedAudio]);
+
+    // MIME type fallback chain
+    const mimeTypes = [
+      'video/webm;codecs=vp8,opus',
+      'video/webm;codecs=vp8',
+      'video/webm',
+    ];
+    const mimeType = mimeTypes.find(m => MediaRecorder.isTypeSupported(m)) ?? '';
+
+    try {
+      const recorder = new MediaRecorder(combinedStream, mimeType ? { mimeType } : undefined);
+      videoChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) videoChunksRef.current.push(e.data);
+      };
+      recorder.start(100);
+      videoRecorderRef.current = recorder;
+      videoRecordingStartRef.current = Date.now();
+      log.info('Video recording started', { mimeType: mimeType || 'browser default' });
+    } catch (err) {
+      log.error('Failed to start video recorder', { error: String(err) });
+      clonedAudio.stop();
+      videoAudioTrackRef.current = null;
+    }
+  }, [cameraEnabled]);
+
+  const stopVideoRecording = useCallback((): Promise<{ blob: Blob; duration: number } | null> => {
+    const recorder = videoRecorderRef.current;
+    if (!recorder || recorder.state === 'inactive') {
+      // Clean up cloned track if present
+      if (videoAudioTrackRef.current) {
+        videoAudioTrackRef.current.stop();
+        videoAudioTrackRef.current = null;
+      }
+      return Promise.resolve(null);
+    }
+
+    return new Promise((resolve) => {
+      recorder.onstop = () => {
+        const blob = new Blob(videoChunksRef.current, { type: recorder.mimeType || 'video/webm' });
+        const duration = Math.floor((Date.now() - videoRecordingStartRef.current) / 1000);
+        videoChunksRef.current = [];
+        videoRecorderRef.current = null;
+
+        if (videoAudioTrackRef.current) {
+          videoAudioTrackRef.current.stop();
+          videoAudioTrackRef.current = null;
+        }
+
+        log.info('Video recording stopped', { blobSize: blob.size, duration });
+        resolve({ blob, duration });
+      };
+      recorder.stop();
+    });
   }, []);
 
   // ─── Main's camera logic ───
@@ -325,6 +405,7 @@ export default function InterviewScreen() {
       } catch (e) {
         log.error('Deepgram transcription failed', { error: String(e) });
       }
+      startVideoRecording(micStream);
     }
 
     // Start face detection (non-blocking — errors won't break the interview)
@@ -400,6 +481,7 @@ export default function InterviewScreen() {
       } catch (e) {
         log.error('Deepgram transcription failed for next question', { error: String(e) });
       }
+      startVideoRecording(micStream);
     }
 
     // Reset + restart face detection for the new question
@@ -449,7 +531,7 @@ export default function InterviewScreen() {
     dispatch({ type: 'SET_TOTAL_DURATION', payload: totalDuration });
 
     try {
-      const blob = await stopRecording();
+      const [blob, videoResult] = await Promise.all([stopRecording(), stopVideoRecording()]);
       if (blob) {
         dispatch({ type: 'STOP_RECORDING', payload: blob });
       }
@@ -471,7 +553,9 @@ export default function InterviewScreen() {
         question,
         transcript,
         audioBlob: blob ?? undefined,
+        videoBlob: videoResult?.blob ?? undefined,
         feedback: null,
+        wordTimestamps: deepgram.getWordTimestamps(),
         metrics: {
           fillerCount: countFillers(transcript),
           wordsPerMinute: currentState.wordsPerMinute,
@@ -525,7 +609,7 @@ export default function InterviewScreen() {
     } finally {
       finishingRef.current = false;
     }
-  }, [clearSilenceTimer, dispatch, navigate, deepgram, stopPlayback, stopRecording, setPhase]);
+  }, [clearSilenceTimer, dispatch, navigate, deepgram, stopPlayback, stopRecording, stopVideoRecording, setPhase]);
 
   useEffect(() => {
     handleDoneRef.current = handleDone;
@@ -627,6 +711,7 @@ export default function InterviewScreen() {
     deepgram.stop();
     faceDetection.stop();
     void stopRecording();
+    void stopVideoRecording();
   };
   useEffect(() => {
     return () => cleanupRef.current();
