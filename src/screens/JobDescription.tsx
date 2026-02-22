@@ -311,7 +311,7 @@ export default function JobDescription() {
           </div>
         </form>
         <div className="job-description__or">
-          <span>or</span>
+          <span>we also recommend</span>
         </div>
         {resumeFile && !extracting ? (
           <div className="job-description__dropzone job-description__dropzone--loaded">
