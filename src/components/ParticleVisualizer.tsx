@@ -3,10 +3,9 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
 interface Props {
-  micEnabled: boolean;
+  analyserNode?: AnalyserNode | null;
   isSpeaking: boolean;
   height?: number;
-  audioCaptureEnabled?: boolean;
   onEnergyChange?: (energy: number) => void;
 }
 
@@ -72,20 +71,19 @@ const MAX_ACTIVE_RADIUS = SPHERE_RADIUS * 0.78;
 const CENTER_DEAD_ZONE = 0.24;
 
 export default function ParticleVisualizer({
-  micEnabled,
+  analyserNode = null,
   isSpeaking,
   height = 285,
-  audioCaptureEnabled = true,
   onEnergyChange,
 }: Props) {
   const mountRef = useRef<HTMLDivElement | null>(null);
-  const micEnabledRef = useRef(micEnabled);
+  const analyserNodeRef = useRef(analyserNode);
   const isSpeakingRef = useRef(isSpeaking);
   const onEnergyChangeRef = useRef(onEnergyChange);
 
   useEffect(() => {
-    micEnabledRef.current = micEnabled;
-  }, [micEnabled]);
+    analyserNodeRef.current = analyserNode;
+  }, [analyserNode]);
 
   useEffect(() => {
     isSpeakingRef.current = isSpeaking;
@@ -166,28 +164,6 @@ export default function ParticleVisualizer({
     const particles = new THREE.Points(geometry, material);
     scene.add(particles);
 
-    let audioCtx: AudioContext | null = null;
-    let analyser: AnalyserNode | null = null;
-    let micStream: MediaStream | null = null;
-    let audioReady = false;
-
-    async function initAudio() {
-      if (!audioCaptureEnabled) return;
-      try {
-        audioCtx = new AudioContext();
-        analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 1024;
-        micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        const source = audioCtx.createMediaStreamSource(micStream);
-        source.connect(analyser);
-        audioReady = true;
-      } catch {
-        audioReady = false;
-      }
-    }
-
-    void initAudio();
-
     let animId = 0;
     let lastTime = 0;
     let energySmooth = 0;
@@ -203,25 +179,27 @@ export default function ParticleVisualizer({
       const t = now * 0.001;
 
       let energy = 0;
-      if (audioReady && analyser && micEnabledRef.current) {
-        const freqData = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(freqData);
+      const currentAnalyser = analyserNodeRef.current;
+      if (currentAnalyser) {
+        const freqData = new Uint8Array(currentAnalyser.frequencyBinCount);
+        currentAnalyser.getByteFrequencyData(freqData);
+        const sampleRate = currentAnalyser.context.sampleRate;
+        const fftSize = currentAnalyser.fftSize;
         let sum = 0;
 
-        const binStart = Math.floor(300 / (audioCtx!.sampleRate / analyser.fftSize));
-        const binEnd = Math.floor(3000 / (audioCtx!.sampleRate / analyser.fftSize));
+        const binStart = Math.floor(300 / (sampleRate / fftSize));
+        const binEnd = Math.floor(3000 / (sampleRate / fftSize));
 
         for (let i = binStart; i < binEnd; i++) sum += freqData[i];
         energy = sum / ((binEnd - binStart) * 255);
       }
 
-      const targetEnergy = micEnabledRef.current ? energy : 0;
-      const energyFollow = micEnabledRef.current ? 0.12 : 0.3;
-      energySmooth += (targetEnergy - energySmooth) * energyFollow;
+      const energyFollow = energy > 0.01 ? 0.12 : 0.3;
+      energySmooth += (energy - energySmooth) * energyFollow;
       onEnergyChangeRef.current?.(energySmooth);
 
       const speakingSignal = isSpeakingRef.current ? 1 : 0;
-      const quietMode = speakingSignal < 0.5 || !micEnabledRef.current;
+      const quietMode = speakingSignal < 0.5;
 
       // quiet-mode ramps up when NOT speaking
       silenceDriveSmooth += ((1 - speakingSignal) - silenceDriveSmooth) * 0.06;
@@ -429,12 +407,10 @@ export default function ParticleVisualizer({
       renderer.dispose();
       geometry.dispose();
       material.dispose();
-      micStream?.getTracks().forEach((t) => t.stop());
-      audioCtx?.close();
       onEnergyChangeRef.current?.(0);
       mount.removeChild(renderer.domElement);
     };
-  }, [height, audioCaptureEnabled]);
+  }, [height]);
 
   return (
     <div

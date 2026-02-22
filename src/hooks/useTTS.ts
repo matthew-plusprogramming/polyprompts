@@ -10,11 +10,35 @@ const RETRY_BACKOFF_MS = 500;
 
 export function useTTS() {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const pendingRejectRef = useRef<((reason: Error) => void) | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+
+  const ensureAudioContext = useCallback(() => {
+    if (!audioCtxRef.current) {
+      const ctx = new AudioContext();
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      analyser.connect(ctx.destination);
+      audioCtxRef.current = ctx;
+      analyserRef.current = analyser;
+      setAnalyserNode(analyser);
+    }
+    if (audioCtxRef.current.state === 'suspended') {
+      void audioCtxRef.current.resume();
+    }
+    return { ctx: audioCtxRef.current, analyser: analyserRef.current! };
+  }, []);
 
   const cleanupAudio = useCallback(() => {
+    if (sourceNodeRef.current) {
+      try { sourceNodeRef.current.disconnect(); } catch { /* already disconnected */ }
+      sourceNodeRef.current = null;
+    }
     if (audioRef.current) {
       audioRef.current.onended = null;
       audioRef.current.onerror = null;
@@ -71,11 +95,22 @@ export function useTTS() {
       cleanupAudio();
       pendingRejectRef.current = reject;
 
+      const { analyser } = ensureAudioContext();
+
       const objectUrl = URL.createObjectURL(blob);
       objectUrlRef.current = objectUrl;
       const audio = new Audio();
       audioRef.current = audio;
       audio.preload = 'auto';
+
+      // Route through Web Audio API for frequency analysis
+      try {
+        const source = audioCtxRef.current!.createMediaElementSource(audio);
+        source.connect(analyser);
+        sourceNodeRef.current = source;
+      } catch (err) {
+        log.warn('Failed to create media element source', { error: String(err) });
+      }
 
       // Timeout: if audio doesn't start playing within threshold, reject
       const playbackTimeout = setTimeout(() => {
@@ -106,7 +141,7 @@ export function useTTS() {
 
       audio.src = objectUrl;
     });
-  }, [cleanupAudio]);
+  }, [cleanupAudio, ensureAudioContext]);
 
   const speak = useCallback(async (text: string, voice?: string, speed?: number) => {
     cleanupAudio();
@@ -149,5 +184,5 @@ export function useTTS() {
     setIsPlaying(false);
   }, [cleanupAudio]);
 
-  return { speak, isPlaying, stopPlayback };
+  return { speak, isPlaying, stopPlayback, analyserNode };
 }
