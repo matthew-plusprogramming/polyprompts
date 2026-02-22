@@ -20,6 +20,9 @@ import { createLogger, setSessionId } from '../utils/logger';
 
 const log = createLogger('Interview');
 
+const INTERVIEW_TTS_INSTRUCTIONS = 'Casual American female voice. Relaxed, steady pacing with natural micro-pauses between phrases. Slight upward inflection when asking questions. No vocal fry. Do not sound like a narrator or announcer — sound like a real person talking across a table.';
+const FEEDBACK_TTS_INSTRUCTIONS = 'Calm, measured delivery. Speak like a thoughtful coach giving a one-on-one debrief — unhurried, direct, matter-of-fact. Pause briefly before key advice. No cheerfulness or hype.';
+
 // ─── Phase state machine ───
 type ScreenPhase =
   | 'ready'
@@ -372,7 +375,7 @@ export default function InterviewScreen() {
     setPhase('speaking-question');
     setStatusText('Reading question aloud...');
     try {
-      await speak(state.currentQuestion.text, state.ttsVoice, state.ttsSpeed);
+      await speak(state.currentQuestion.text, { voice: state.ttsVoice, speed: 1.0, instructions: INTERVIEW_TTS_INSTRUCTIONS });
     } catch (e) {
       log.error('TTS error — continuing without audio', { error: String(e) });
     }
@@ -449,7 +452,7 @@ export default function InterviewScreen() {
     setPhase('transitioning');
     setStatusText('Moving to next question...');
     try {
-      await speak("Great, let's move on to the next question.", state.ttsVoice, state.ttsSpeed);
+      await speak("Great, let's move on to the next question.", { voice: state.ttsVoice, speed: 1.0, instructions: INTERVIEW_TTS_INSTRUCTIONS });
     } catch (e) {
       log.warn('Transition TTS failed', { error: String(e) });
     }
@@ -458,7 +461,7 @@ export default function InterviewScreen() {
     setPhase('speaking-question');
     setStatusText('Reading question aloud...');
     try {
-      await speak(nextQuestion.text, state.ttsVoice, state.ttsSpeed);
+      await speak(nextQuestion.text, { voice: state.ttsVoice, speed: 1.0, instructions: INTERVIEW_TTS_INSTRUCTIONS });
     } catch (e) {
       log.error('TTS error — continuing without audio', { error: String(e) });
     }
@@ -638,7 +641,7 @@ export default function InterviewScreen() {
           // Fire voice summary generation + TTS prefetch in background (non-blocking)
           generateVoiceSummary(feedbackResponse)
             .then((summaryText) => {
-              prefetchTTS([summaryText], currentState.ttsVoice, currentState.ttsSpeed);
+              prefetchTTS([summaryText], currentState.ttsVoice, 1.0, FEEDBACK_TTS_INSTRUCTIONS);
               dispatch({ type: 'SET_VOICE_SUMMARY', payload: summaryText });
               log.info('Voice summary ready', { length: summaryText.length });
             })
@@ -734,7 +737,7 @@ export default function InterviewScreen() {
       "Are you finished, or would you like to keep going?",
     ];
     if (nextQuestion) texts.push(nextQuestion.text);
-    prefetchTTS(texts, state.ttsVoice, state.ttsSpeed);
+    prefetchTTS(texts, state.ttsVoice, 1.0, INTERVIEW_TTS_INSTRUCTIONS);
   }, [phase, state.currentQuestionIndex, state.questions, state.ttsVoice, state.ttsSpeed]);
 
   // Keep context transcript in sync
@@ -861,15 +864,24 @@ export default function InterviewScreen() {
         flexDirection: 'column',
         borderRadius: '26px',
         border: '1px solid rgba(255, 255, 255, 0.14)',
+<<<<<<< HEAD
         color: '#f7f7f7',
         backgroundColor: '#000',
         background: '#000',
         boxShadow: '0 20px 80px rgba(0, 0, 0, 0.75)',
+=======
+        color: '#eef8ff',
+        backgroundColor: '#050a14',
+        background:
+          'radial-gradient(circle at 12% -5%, rgba(255, 255, 255, 0.14), transparent 34%), radial-gradient(circle at 88% 8%, rgba(220, 220, 220, 0.12), transparent 32%), linear-gradient(145deg, rgba(8, 12, 18, 0.98), rgba(10, 10, 10, 0.96) 48%, rgba(14, 16, 20, 0.98)), repeating-linear-gradient(135deg, rgba(148, 163, 184, 0.04) 0px, rgba(148, 163, 184, 0.04) 1px, transparent 1px, transparent 15px)',
+        boxShadow: '0 20px 80px rgba(2, 8, 22, 0.7), inset 0 0 45px rgba(255, 255, 255, 0.05)',
+>>>>>>> fbab13b941243522a507bcb3b2200d8482fba810
         fontFamily: "'Josefin Sans', sans-serif",
       }}
     >
       <style>
         {`
+<<<<<<< HEAD
           @import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@500;600;700&display=swap');
           .interview-stars {
             position: absolute;
@@ -903,6 +915,8 @@ export default function InterviewScreen() {
           .interview-screen-root .end-interview-btn {
             font-weight: 700 !important;
           }
+=======
+>>>>>>> fbab13b941243522a507bcb3b2200d8482fba810
           .transcript-scroll {
             scrollbar-width: thin;
             scrollbar-color: rgba(230, 230, 230, 0.9) rgba(20, 28, 40, 0.55);
@@ -1086,6 +1100,7 @@ export default function InterviewScreen() {
             justifyContent: 'center',
             fontSize: '0.78rem',
             fontWeight: 700,
+<<<<<<< HEAD
             color: '#f5f5f5',
             fontFamily: "'Josefin Sans', sans-serif",
             background: 'transparent',
@@ -1093,6 +1108,15 @@ export default function InterviewScreen() {
             borderRadius: '10px',
             padding: '0.36rem 0.72rem',
             boxShadow: 'none',
+=======
+            color: '#041018',
+            fontFamily: "'Josefin Sans', sans-serif",
+            background: 'linear-gradient(135deg, #f3f3f3 5%, #dcdcdc 52%, #b8b8b8 100%)',
+            border: '1px solid rgba(255, 255, 255, 0.45)',
+            borderRadius: '14px',
+            padding: '0.52rem 1rem',
+            boxShadow: '0 0 24px rgba(255, 255, 255, 0.25), inset 0 -6px 14px rgba(0, 0, 0, 0.18)',
+>>>>>>> fbab13b941243522a507bcb3b2200d8482fba810
             letterSpacing: '0.08em',
           }}
         >
@@ -1100,7 +1124,11 @@ export default function InterviewScreen() {
         </div>
 
         <div style={{ justifySelf: 'end', display: 'flex', gap: '0.6rem' }}>
+<<<<<<< HEAD
           {phase === 'ready' && (
+=======
+          {phase === 'ready' ? (
+>>>>>>> fbab13b941243522a507bcb3b2200d8482fba810
             <button
               type="button"
               className="start-interview-btn"
@@ -1431,7 +1459,11 @@ export default function InterviewScreen() {
                   />
                   <span
                     style={{
+<<<<<<< HEAD
                 fontFamily: "'Josefin Sans', sans-serif",
+=======
+                      fontFamily: "'Josefin Sans', sans-serif",
+>>>>>>> fbab13b941243522a507bcb3b2200d8482fba810
                       fontSize: '10px',
                       fontWeight: '600',
                       letterSpacing: '0.06em',

@@ -88,7 +88,7 @@ function MetricCard({ label, value, subLabel, color }: MetricCardProps) {
           letterSpacing: '0.08em',
           textTransform: 'uppercase',
           color: '#6b7280',
-          fontFamily: "'Syne', sans-serif",
+          fontFamily: "'Josefin Sans', sans-serif",
         }}
       >
         {label}
@@ -98,7 +98,7 @@ function MetricCard({ label, value, subLabel, color }: MetricCardProps) {
           fontSize: '22px',
           fontWeight: '800',
           color,
-          fontFamily: "'Syne', sans-serif",
+          fontFamily: "'Josefin Sans', sans-serif",
           letterSpacing: '-0.02em',
           lineHeight: 1.1,
         }}
@@ -109,7 +109,7 @@ function MetricCard({ label, value, subLabel, color }: MetricCardProps) {
         style={{
           fontSize: '11px',
           color: '#4b5563',
-          fontFamily: "'Syne', sans-serif",
+          fontFamily: "'Josefin Sans', sans-serif",
         }}
       >
         {subLabel}
@@ -151,7 +151,7 @@ export default function CoachingMetrics({
           border: 'none',
           cursor: 'pointer',
           color: '#6b7280',
-          fontFamily: "'Syne', sans-serif",
+          fontFamily: "'Josefin Sans', sans-serif",
           fontSize: '11px',
           fontWeight: '700',
           letterSpacing: '0.08em',

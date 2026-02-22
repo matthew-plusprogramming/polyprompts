@@ -60,7 +60,7 @@ export default function DoneButton({ onDone, disabled = false, isMobile = false 
               ? '#1c1c2e'
               : 'linear-gradient(135deg, #4338ca, #6366f1 50%, #22d3ee)',
             color: disabled ? '#374151' : '#fff',
-            fontFamily: "'Syne', sans-serif",
+            fontFamily: "'Josefin Sans', sans-serif",
             fontSize: '17px',
             fontWeight: '800',
             letterSpacing: '0.02em',
@@ -78,7 +78,7 @@ export default function DoneButton({ onDone, disabled = false, isMobile = false 
             fontSize: '12px',
             color: disabled ? '#1f2937' : '#4b5563',
             letterSpacing: '0.04em',
-            fontFamily: "'Syne', sans-serif",
+            fontFamily: "'Josefin Sans', sans-serif",
             transition: 'color 0.3s',
             userSelect: 'none',
           }}

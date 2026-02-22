@@ -116,11 +116,11 @@ function Sparkline({ label, color, values, attemptLabels }: SparklineProps) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, flexShrink: 0 }} />
-          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          <span style={{ fontFamily: "'Josefin Sans', sans-serif", fontSize: '10px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             {label}
           </span>
         </div>
-        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '11px', fontWeight: 700, color: trendArrowColor }} title={`Trend: ${trend}`}>
+        <span style={{ fontFamily: "'Josefin Sans', sans-serif", fontSize: '11px', fontWeight: 700, color: trendArrowColor }} title={`Trend: ${trend}`}>
           {trendArrow}
         </span>
       </div>
@@ -149,7 +149,7 @@ function Sparkline({ label, color, values, attemptLabels }: SparklineProps) {
       </svg>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2px' }}>
-        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '9px', fontWeight: 600, color, opacity: 0.8, letterSpacing: '0.04em' }}>
+        <span style={{ fontFamily: "'Josefin Sans', sans-serif", fontSize: '9px', fontWeight: 600, color, opacity: 0.8, letterSpacing: '0.04em' }}>
           now: {Math.round(values[values.length - 1])}%
         </span>
       </div>
@@ -187,10 +187,10 @@ function OverallChart({ avgValues, attemptLabels }: OverallChartProps) {
   return (
     <div style={{ background: 'rgba(255,255,255,0.018)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '12px 14px 10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        <span style={{ fontFamily: "'Josefin Sans', sans-serif", fontSize: '10px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           Average Score
         </span>
-        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '11px', fontWeight: 700, color: netColor }}>
+        <span style={{ fontFamily: "'Josefin Sans', sans-serif", fontSize: '11px', fontWeight: 700, color: netColor }}>
           {netLabel}
         </span>
       </div>
@@ -255,7 +255,7 @@ export default function ScoreTrendChart({ currentResult, previousAttempts }: Sco
         boxShadow: '0 24px 60px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04)',
         position: 'relative',
         overflow: 'hidden',
-        fontFamily: "'DM Sans', sans-serif",
+        fontFamily: "'Josefin Sans', sans-serif",
       }}
     >
       <div style={{ position: 'absolute', top: 0, left: '10%', right: '10%', height: '1px', background: 'linear-gradient(90deg, transparent, rgba(34,197,94,0.5), rgba(99,102,241,0.4), transparent)', pointerEvents: 'none' }} />
@@ -265,10 +265,10 @@ export default function ScoreTrendChart({ currentResult, previousAttempts }: Sco
           ↑
         </div>
         <div>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: '15px', fontWeight: 800, color: '#f9fafb', letterSpacing: '-0.01em' }}>
+          <div style={{ fontFamily: "'Josefin Sans', sans-serif", fontSize: '15px', fontWeight: 800, color: '#f9fafb', letterSpacing: '-0.01em' }}>
             Score Trend
           </div>
-          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#4b5563', letterSpacing: '0.06em' }}>
+          <div style={{ fontFamily: "'Josefin Sans', sans-serif", fontSize: '10px', color: '#4b5563', letterSpacing: '0.06em' }}>
             {allAttempts.length} attempt{allAttempts.length !== 1 ? 's' : ''}
           </div>
         </div>
@@ -280,7 +280,7 @@ export default function ScoreTrendChart({ currentResult, previousAttempts }: Sco
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
         <div style={{ width: '3px', height: '14px', borderRadius: '2px', background: '#6366f1', flexShrink: 0 }} />
-        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', fontWeight: 600, color: 'rgba(99,102,241,0.6)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+        <span style={{ fontFamily: "'Josefin Sans', sans-serif", fontSize: '10px', fontWeight: 600, color: 'rgba(99,102,241,0.6)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
           Per Dimension
         </span>
         <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(99,102,241,0.22), transparent)' }} />
@@ -300,7 +300,7 @@ export default function ScoreTrendChart({ currentResult, previousAttempts }: Sco
         ] as const).map(({ color, label }) => (
           <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
             <div style={{ width: '20px', height: '3px', borderRadius: '2px', background: color, opacity: 0.85 }} />
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#4b5563' }}>{label}</span>
+            <span style={{ fontFamily: "'Josefin Sans', sans-serif", fontSize: '10px', color: '#4b5563' }}>{label}</span>
           </div>
         ))}
       </div>

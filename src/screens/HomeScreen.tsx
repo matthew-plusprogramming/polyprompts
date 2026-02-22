@@ -22,7 +22,6 @@ export default function HomeScreen() {
       }}
     >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@500;600;700&display=swap');
         @keyframes floatGlow {
           0%, 100% { transform: translateY(0px) scale(1); opacity: 0.55; }
           50% { transform: translateY(-10px) scale(1.03); opacity: 0.78; }
@@ -56,6 +55,33 @@ export default function HomeScreen() {
           zIndex: 3,
         }}
       />
+
+      <button
+        type="button"
+        onClick={() => navigate('/info')}
+        aria-label="Learn more"
+        style={{
+          position: 'absolute',
+          top: '22px',
+          right: '20px',
+          zIndex: 3,
+          background: 'none',
+          border: '1.5px solid rgba(255,255,255,0.25)',
+          borderRadius: '50%',
+          width: '32px',
+          height: '32px',
+          color: 'rgba(255,255,255,0.7)',
+          cursor: 'pointer',
+          fontSize: '16px',
+          fontWeight: 700,
+          fontFamily: "'Josefin Sans', serif",
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        i
+      </button>
 
       <div
         style={{
@@ -115,7 +141,7 @@ export default function HomeScreen() {
 
           <button
             type="button"
-            onClick={() => navigate('/setup')}
+            onClick={() => navigate('/job-description')}
             style={{
               marginTop: '22px',
               border: 'none',

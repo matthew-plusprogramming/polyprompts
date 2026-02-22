@@ -32,7 +32,7 @@ function PerformanceSummary({
     backdropFilter: 'blur(24px)',
     boxShadow: '0 24px 60px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04)',
     overflow: 'hidden',
-    fontFamily: "'DM Sans', sans-serif",
+    fontFamily: "'Josefin Sans', sans-serif",
   };
 
   const shimmerStyle: CSSProperties = {
@@ -78,7 +78,7 @@ function PerformanceSummary({
   };
 
   const headingTextStyle: CSSProperties = {
-    fontFamily: "'Syne', sans-serif",
+    fontFamily: "'Josefin Sans', sans-serif",
     fontSize: '15px',
     fontWeight: '800',
     color: '#f9fafb',
@@ -117,7 +117,7 @@ function PerformanceSummary({
   };
 
   const highlightLabelStyle: CSSProperties = {
-    fontFamily: "'DM Mono', monospace",
+    fontFamily: "'Josefin Sans', sans-serif",
     fontSize: '10px',
     fontWeight: 600,
     letterSpacing: '0.10em',
@@ -126,7 +126,7 @@ function PerformanceSummary({
   };
 
   const highlightValueStyle: CSSProperties = {
-    fontFamily: "'Syne', sans-serif",
+    fontFamily: "'Josefin Sans', sans-serif",
     fontSize: '14px',
     fontWeight: '700',
   };
@@ -154,7 +154,7 @@ function PerformanceSummary({
   };
 
   const sectionLabelStyle: CSSProperties = {
-    fontFamily: "'DM Mono', monospace",
+    fontFamily: "'Josefin Sans', sans-serif",
     fontSize: '10px',
     fontWeight: '600',
     color: 'rgba(34,197,94,0.7)',
@@ -179,7 +179,7 @@ function PerformanceSummary({
   };
 
   const calloutLabelStyle: CSSProperties = {
-    fontFamily: "'DM Mono', monospace",
+    fontFamily: "'Josefin Sans', sans-serif",
     fontSize: '10px',
     fontWeight: 600,
     color: 'rgba(34,197,94,0.65)',
@@ -210,7 +210,7 @@ function PerformanceSummary({
           <div style={headingTextStyle}>Performance Summary</div>
           <div
             style={{
-              fontFamily: "'DM Mono', monospace",
+              fontFamily: "'Josefin Sans', sans-serif",
               fontSize: '10px',
               color: '#4b5563',
               letterSpacing: '0.06em',

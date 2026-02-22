@@ -13,12 +13,12 @@ import { createLogger } from '../utils/logger';
 
 const log = createLogger('PreInterview');
 
-type Phase = 'initializing' | 'listening' | 'responding' | 'completing';
+type Phase = 'initializing' | 'listening' | 'responding';
 
 export default function PreInterviewScreen() {
   const { state } = useInterview();
   const navigate = useNavigate();
-  const { speak, isPlaying: ttsPlaying, stopPlayback, analyserNode: ttsAnalyserNode } = useTTS();
+  const { speak, speakChunks, isPlaying: ttsPlaying, stopPlayback, analyserNode: ttsAnalyserNode } = useTTS();
   const deepgram = useDeepgramTranscription();
 
   const [phase, setPhase] = useState<Phase>('initializing');
@@ -51,7 +51,7 @@ export default function PreInterviewScreen() {
 
   // Prefetch TTS for all hardcoded responses on mount
   useEffect(() => {
-    prefetchTTS(getPreInterviewPrefetchTexts(script));
+    prefetchTTS(getPreInterviewPrefetchTexts(script), 'marin', 1.0);
   }, []);
 
   // Initialize mic + Deepgram
@@ -100,7 +100,9 @@ export default function PreInterviewScreen() {
       setPhase('responding');
       log.info('Trigger detected', { stepIndex: currentStepIndex, trigger: step.trigger });
 
-      let responseText = step.response ?? '';
+      // Build response chunks (string[] for chunked TTS, or single string from AI)
+      let chunks: string[];
+      const rawResponse = step.response ?? '';
 
       // Try AI-generated response if directive is set
       if (step.aiDirective) {
@@ -111,21 +113,24 @@ export default function PreInterviewScreen() {
             step.aiDirective,
             transcriptContext,
           );
-          responseText = aiResponse;
+          chunks = [aiResponse];
           log.info('AI response generated', { length: aiResponse.length });
         } catch (err) {
           log.warn('AI response failed, using fallback', { error: String(err) });
-          // responseText already set to fallback
+          chunks = Array.isArray(rawResponse) ? rawResponse : [rawResponse];
         }
+      } else {
+        chunks = Array.isArray(rawResponse) ? rawResponse : [rawResponse];
       }
 
-      // Play TTS — show subtitle only once audio actually starts
+      const fullText = chunks.join(' ');
+
+      // Play chunks as separate TTS calls (pre-fetched in parallel, played sequentially)
       try {
-        await speak(responseText, { onStart: () => setSubtitle(responseText) });
+        await speakChunks(chunks, { onStart: () => setSubtitle(fullText) });
       } catch (err) {
         log.warn('TTS playback failed', { error: String(err) });
-        // Show text as fallback if TTS fails
-        setSubtitle(responseText);
+        setSubtitle(fullText);
       }
 
       // Advance past any echo text
@@ -135,14 +140,7 @@ export default function PreInterviewScreen() {
       // Move to next step or complete
       const nextIndex = currentStepIndex + 1;
       if (nextIndex >= script.steps.length) {
-        // All steps done — play completion message
-        setPhase('completing');
-        try {
-          await speak(script.completionMessage, { onStart: () => setSubtitle(script.completionMessage) });
-        } catch (err) {
-          log.warn('Completion TTS failed', { error: String(err) });
-          setSubtitle(script.completionMessage);
-        }
+        // All steps done — go straight to interview
         navigate('/interview', { replace: true, state: { autoStart: true } });
       } else {
         setStepIndex(nextIndex);
@@ -217,11 +215,10 @@ export default function PreInterviewScreen() {
         justifyContent: 'center',
         position: 'relative',
         overflow: 'hidden',
-        fontFamily: "'DM Sans', sans-serif",
+        fontFamily: "'Josefin Sans', sans-serif",
       }}
     >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:ital,wght@0,400;0,500;1,400&family=DM+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap');
         @keyframes pulse-ring {
           0%   { transform: scale(1); opacity: 0.7; }
           100% { transform: scale(1.7); opacity: 0; }
@@ -244,7 +241,7 @@ export default function PreInterviewScreen() {
           border-radius: 10px;
           color: #4b5563;
           cursor: pointer;
-          font-family: 'DM Mono', monospace;
+          font-family: 'Josefin Sans', sans-serif;
           font-size: 12px;
           padding: 8px 20px;
           transition: all 0.18s;
@@ -336,7 +333,7 @@ export default function PreInterviewScreen() {
           <p
             key={subtitle.slice(0, 30)}
             style={{
-              fontFamily: "'DM Sans', sans-serif",
+              fontFamily: "'Josefin Sans', sans-serif",
               fontSize: '16px',
               color: '#d1d5db',
               lineHeight: 1.6,
@@ -384,7 +381,7 @@ export default function PreInterviewScreen() {
             </div>
             <span
               style={{
-                fontFamily: "'DM Mono', monospace",
+                fontFamily: "'Josefin Sans', sans-serif",
                 fontSize: '12px',
                 fontWeight: '600',
                 color: '#22d3ee',
@@ -417,7 +414,7 @@ export default function PreInterviewScreen() {
             />
             <span
               style={{
-                fontFamily: "'DM Mono', monospace",
+                fontFamily: "'Josefin Sans', sans-serif",
                 fontSize: '12px',
                 fontWeight: '600',
                 color: '#a78bfa',
@@ -431,7 +428,7 @@ export default function PreInterviewScreen() {
         {phase === 'initializing' && (
           <div
             style={{
-              fontFamily: "'DM Mono', monospace",
+              fontFamily: "'Josefin Sans', sans-serif",
               fontSize: '12px',
               color: '#4b5563',
               letterSpacing: '0.08em',
@@ -449,7 +446,7 @@ export default function PreInterviewScreen() {
             ...stagger(4),
             zIndex: 1,
             marginBottom: '20px',
-            fontFamily: "'DM Mono', monospace",
+            fontFamily: "'Josefin Sans', sans-serif",
             fontSize: '11px',
             color: '#2d2d40',
           }}

@@ -6,8 +6,11 @@ import { prefetchTTS } from '../services/openai';
 import { getPreInterviewPrefetchTexts } from '../config/preInterviewScript';
 import type { Difficulty, Role } from '../types';
 import { createLogger } from '../utils/logger';
+import { extractNameFromResume } from '../utils/resumeName';
 
 const log = createLogger('Setup');
+
+const INTERVIEW_TTS_INSTRUCTIONS = 'Casual American female voice. Relaxed, steady pacing with natural micro-pauses between phrases. Slight upward inflection when asking questions. No vocal fry. Do not sound like a narrator or announcer — sound like a real person talking across a table.';
 
 /* ─────────────────────────────────────────────
    DATA
@@ -178,7 +181,7 @@ function RoleCard({ role, selected, onClick }: { role: (typeof ROLES)[number]; s
       <div style={{ fontSize: '20px', marginBottom: '8px' }}>{role.icon}</div>
       <div
         style={{
-          fontFamily: "'Syne',sans-serif",
+          fontFamily: "'Josefin Sans', sans-serif",
           fontSize: '13px',
           fontWeight: '700',
           color: selected ? role.color : '#d1d5db',
@@ -190,7 +193,7 @@ function RoleCard({ role, selected, onClick }: { role: (typeof ROLES)[number]; s
       </div>
       <div
         style={{
-          fontFamily: "'DM Mono',monospace",
+          fontFamily: "'Josefin Sans', sans-serif",
           fontSize: '10px',
           color: selected ? `${role.color}99` : '#4b5563',
           transition: 'color 0.2s',
@@ -275,7 +278,7 @@ function DifficultyPill({
       </span>
       <span
         style={{
-          fontFamily: "'Syne',sans-serif",
+          fontFamily: "'Josefin Sans', sans-serif",
           fontSize: '13px',
           fontWeight: '700',
           color: selected ? diff.color : '#9ca3af',
@@ -320,7 +323,7 @@ function CategoryChip({ cat, selected, onClick }: { cat: (typeof CATEGORIES)[num
       <span style={{ fontSize: '13px' }}>{cat.icon}</span>
       <span
         style={{
-          fontFamily: "'DM Mono',monospace",
+          fontFamily: "'Josefin Sans', sans-serif",
           fontSize: '11px',
           fontWeight: selected ? '600' : '400',
           color: selected ? '#a5b4fc' : hov ? '#818cf8' : '#6b7280',
@@ -527,7 +530,7 @@ function ResumeUpload({
             <div>
               <div
                 style={{
-                  fontFamily: "'Syne', sans-serif",
+                  fontFamily: "'Josefin Sans', sans-serif",
                   fontWeight: '700',
                   fontSize: '13px',
                   color: '#34d399',
@@ -538,7 +541,7 @@ function ResumeUpload({
               </div>
               <div
                 style={{
-                  fontFamily: "'DM Mono', monospace",
+                  fontFamily: "'Josefin Sans', sans-serif",
                   fontSize: '11px',
                   color: '#6b7280',
                   maxWidth: '240px',
@@ -587,7 +590,7 @@ function ResumeUpload({
         <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid rgba(52,211,153,0.12)' }}>
           <div
             style={{
-              fontFamily: "'DM Mono', monospace",
+              fontFamily: "'Josefin Sans', sans-serif",
               fontSize: '10px',
               color: '#34d39966',
               letterSpacing: '0.1em',
@@ -600,7 +603,7 @@ function ResumeUpload({
 
           <div
             style={{
-              fontFamily: "'DM Mono', monospace",
+              fontFamily: "'Josefin Sans', sans-serif",
               fontSize: '11px',
               color: '#6b7280',
               lineHeight: 1.5,
@@ -619,7 +622,7 @@ function ResumeUpload({
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              fontFamily: "'DM Mono', monospace",
+              fontFamily: "'Josefin Sans', sans-serif",
               fontSize: '10px',
               color: '#34d399aa',
             }}
@@ -690,7 +693,7 @@ function ResumeUpload({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontFamily: "'DM Mono', monospace",
+              fontFamily: "'Josefin Sans', sans-serif",
               fontSize: '10px',
               color: '#818cf8',
               fontWeight: '600',
@@ -703,7 +706,7 @@ function ResumeUpload({
         <div>
           <div
             style={{
-              fontFamily: "'Syne', sans-serif",
+              fontFamily: "'Josefin Sans', sans-serif",
               fontWeight: '700',
               fontSize: '14px',
               color: '#d1d5db',
@@ -715,7 +718,7 @@ function ResumeUpload({
           </div>
           <div
             style={{
-              fontFamily: "'DM Mono', monospace",
+              fontFamily: "'Josefin Sans', sans-serif",
               fontSize: '11px',
               color: '#4b5563',
               textAlign: 'center',
@@ -815,7 +818,7 @@ function ResumeUpload({
       <div style={{ textAlign: 'center' }}>
         <div
           style={{
-            fontFamily: "'Syne', sans-serif",
+            fontFamily: "'Josefin Sans', sans-serif",
             fontWeight: '700',
             fontSize: '14px',
             color: dragging ? '#818cf8' : '#9ca3af',
@@ -825,7 +828,7 @@ function ResumeUpload({
         >
           {dragging ? 'Drop it here!' : 'Drop your resume here'}
         </div>
-        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '11px', color: '#374151' }}>
+        <div style={{ fontFamily: "'Josefin Sans', sans-serif", fontSize: '11px', color: '#374151' }}>
           or <span style={{ color: '#6366f1', textDecoration: 'underline' }}>browse files</span> · PDF, DOCX, TXT · max 5 MB
         </div>
       </div>
@@ -837,7 +840,7 @@ function ResumeUpload({
             border: '1px solid rgba(248,113,113,0.2)',
             borderRadius: '8px',
             padding: '8px 14px',
-            fontFamily: "'DM Mono', monospace",
+            fontFamily: "'Josefin Sans', sans-serif",
             fontSize: '11px',
             color: '#f87171',
           }}
@@ -881,7 +884,7 @@ function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (mode: Mode) => 
             alignItems: 'center',
             justifyContent: 'center',
             gap: '7px',
-            fontFamily: "'DM Mono', monospace",
+            fontFamily: "'Josefin Sans', sans-serif",
             fontSize: '12px',
             fontWeight: '600',
             transition: 'all 0.2s cubic-bezier(0.34,1.56,0.64,1)',
@@ -966,7 +969,7 @@ function StarModal({ onClose }: { onClose: () => void }) {
           <div>
             <div
               style={{
-                fontFamily: "'DM Mono',monospace",
+                fontFamily: "'Josefin Sans', sans-serif",
                 fontSize: '10px',
                 color: '#6366f1',
                 letterSpacing: '0.12em',
@@ -979,7 +982,7 @@ function StarModal({ onClose }: { onClose: () => void }) {
             <h2
               style={{
                 margin: 0,
-                fontFamily: "'Syne',sans-serif",
+                fontFamily: "'Josefin Sans', sans-serif",
                 fontSize: '24px',
                 fontWeight: '800',
                 color: '#f9fafb',
@@ -1047,7 +1050,7 @@ function StarModal({ onClose }: { onClose: () => void }) {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontFamily: "'Syne',sans-serif",
+                  fontFamily: "'Josefin Sans', sans-serif",
                   fontWeight: '800',
                   fontSize: '16px',
                   color: item.color,
@@ -1058,7 +1061,7 @@ function StarModal({ onClose }: { onClose: () => void }) {
               <div>
                 <div
                   style={{
-                    fontFamily: "'Syne',sans-serif",
+                    fontFamily: "'Josefin Sans', sans-serif",
                     fontSize: '13px',
                     fontWeight: '700',
                     color: item.color,
@@ -1067,7 +1070,7 @@ function StarModal({ onClose }: { onClose: () => void }) {
                 >
                   {item.word}
                 </div>
-                <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '13px', color: '#6b7280', lineHeight: 1.5 }}>
+                <div style={{ fontFamily: "'Josefin Sans', sans-serif", fontSize: '13px', color: '#6b7280', lineHeight: 1.5 }}>
                   {item.desc}
                 </div>
               </div>
@@ -1080,7 +1083,7 @@ function StarModal({ onClose }: { onClose: () => void }) {
             border: '1px solid rgba(99,102,241,0.12)',
             borderRadius: '10px',
             padding: '12px 14px',
-            fontFamily: "'DM Mono',monospace",
+            fontFamily: "'Josefin Sans', sans-serif",
             fontSize: '11px',
             color: '#6366f170',
             lineHeight: 1.6,
@@ -1109,7 +1112,7 @@ function SectionLabel({ step, children, optional }: { step: string; children: Re
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontFamily: "'DM Mono',monospace",
+          fontFamily: "'Josefin Sans', sans-serif",
           fontSize: '10px',
           fontWeight: '700',
           color: '#818cf8',
@@ -1119,7 +1122,7 @@ function SectionLabel({ step, children, optional }: { step: string; children: Re
       </div>
       <span
         style={{
-          fontFamily: "'DM Mono',monospace",
+          fontFamily: "'Josefin Sans', sans-serif",
           fontSize: '11px',
           fontWeight: '600',
           color: '#4b5563',
@@ -1130,7 +1133,7 @@ function SectionLabel({ step, children, optional }: { step: string; children: Re
         {children}
       </span>
       {optional && (
-        <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '10px', color: '#2d2d40', letterSpacing: '0.06em' }}>
+        <span style={{ fontFamily: "'Josefin Sans', sans-serif", fontSize: '10px', color: '#2d2d40', letterSpacing: '0.06em' }}>
           optional
         </span>
       )}
@@ -1175,6 +1178,7 @@ export default function SetupScreen() {
     const isGenericReady = mode === 'generic';
     if (!isResumeReady && !isGenericReady) return;
 
+    const candidateName = mode === 'resume' && resumeResult ? extractNameFromResume(resumeResult.text) : null;
     const cacheKey = `${mappedRole}:${difficulty}:${mode}:${resumeResult?.text?.slice(0, 50) ?? ''}:${jobDescription.slice(0, 50)}`;
     if (prefetchedQuestionsRef.current?.key === cacheKey) return;
 
@@ -1183,7 +1187,7 @@ export default function SetupScreen() {
       role: mappedRole,
       difficulty,
       count: 2,
-      ...(mode === 'resume' && resumeResult ? { resumeText: resumeResult.text, jobDescription: jobDescription.trim() } : {}),
+      ...(mode === 'resume' && resumeResult ? { resumeText: resumeResult.text, jobDescription: jobDescription.trim(), ...(candidateName ? { candidateName } : {}) } : {}),
     });
     prefetchedQuestionsRef.current = { key: cacheKey, promise };
 
@@ -1193,7 +1197,7 @@ export default function SetupScreen() {
       const textsToCache = questions.map(q => q.text);
       if (questions.length > 1) textsToCache.push("Great, let's move on to the next question.");
       textsToCache.push("Are you finished, or would you like to keep going?");
-      prefetchTTS(textsToCache);
+      prefetchTTS(textsToCache, 'marin', 1.0, INTERVIEW_TTS_INSTRUCTIONS);
     }).catch(() => { /* will retry in handleStart */ });
   }, [role, difficulty, mode, resumeResult, jobDescription]);
 
@@ -1219,6 +1223,8 @@ export default function SetupScreen() {
     if (mode === 'resume' && resumeResult && jobDescription.trim()) {
       dispatch({ type: 'SET_RESUME_TEXT', payload: resumeResult.text });
       dispatch({ type: 'SET_JOB_DESCRIPTION', payload: jobDescription.trim() });
+      const name = extractNameFromResume(resumeResult.text);
+      if (name) dispatch({ type: 'SET_CANDIDATE_NAME', payload: name });
     }
 
     try {
@@ -1230,11 +1236,12 @@ export default function SetupScreen() {
         questions = await prefetchedQuestionsRef.current.promise;
       } else {
         log.info('Prefetch miss, generating questions fresh');
+        const freshName = mode === 'resume' && resumeResult ? extractNameFromResume(resumeResult.text) : null;
         questions = await loadQuestions({
           role: mappedRole,
           difficulty,
           count: 2,
-          ...(mode === 'resume' && resumeResult ? { resumeText: resumeResult.text, jobDescription: jobDescription.trim() } : {}),
+          ...(mode === 'resume' && resumeResult ? { resumeText: resumeResult.text, jobDescription: jobDescription.trim(), ...(freshName ? { candidateName: freshName } : {}) } : {}),
         });
       }
 
@@ -1247,12 +1254,12 @@ export default function SetupScreen() {
           textsToCache.push("Great, let's move on to the next question.");
         }
         textsToCache.push("Are you finished, or would you like to keep going?");
-        prefetchTTS(textsToCache);
+        prefetchTTS(textsToCache, 'marin', 1.0, INTERVIEW_TTS_INSTRUCTIONS);
       } else {
         log.warn('No questions matched filters', { role: mappedRole, difficulty, category });
       }
       // Prefetch pre-interview script TTS alongside question TTS
-      prefetchTTS(getPreInterviewPrefetchTexts());
+      prefetchTTS(getPreInterviewPrefetchTexts(), 'marin', 1.0);
       navigate('/pre-interview');
     } catch (err) {
       console.error('[SetupScreen] Failed to load questions:', err);
@@ -1281,7 +1288,6 @@ export default function SetupScreen() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:ital,wght@0,400;0,500;1,400&family=DM+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: #05050a; }
 
@@ -1310,7 +1316,7 @@ export default function SetupScreen() {
           50%     { opacity:0.55; }
         }
 
-        .how-link { background:none;border:none;cursor:pointer;font-family:'DM Mono',monospace;font-size:12px;color:#374151;text-decoration:underline;text-underline-offset:3px;padding:0;transition:color 0.15s; }
+        .how-link { background:none;border:none;cursor:pointer;font-family:'Josefin Sans',sans-serif;font-size:12px;color:#374151;text-decoration:underline;text-underline-offset:3px;padding:0;transition:color 0.15s; }
         .how-link:hover { color:#818cf8; }
       `}</style>
 
@@ -1353,7 +1359,7 @@ export default function SetupScreen() {
           alignItems: 'center',
           justifyContent: 'center',
           padding: '40px 20px',
-          fontFamily: "'DM Sans',sans-serif",
+          fontFamily: "'Josefin Sans', sans-serif",
         }}
       >
         <div style={{ width: '100%', maxWidth: '580px' }}>
@@ -1384,7 +1390,7 @@ export default function SetupScreen() {
               </div>
               <span
                 style={{
-                  fontFamily: "'DM Mono',monospace",
+                  fontFamily: "'Josefin Sans', sans-serif",
                   fontSize: '11px',
                   color: '#22d3ee',
                   letterSpacing: '0.1em',
@@ -1397,7 +1403,7 @@ export default function SetupScreen() {
 
             <h1
               style={{
-                fontFamily: "'Syne',sans-serif",
+                fontFamily: "'Josefin Sans', sans-serif",
                 fontSize: 'clamp(32px,6vw,48px)',
                 fontWeight: '800',
                 letterSpacing: '-0.03em',
@@ -1451,7 +1457,7 @@ export default function SetupScreen() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
               <span
                 style={{
-                  fontFamily: "'DM Mono',monospace",
+                  fontFamily: "'Josefin Sans', sans-serif",
                   fontSize: '11px',
                   color: '#4b5563',
                   letterSpacing: '0.12em',
@@ -1512,7 +1518,7 @@ export default function SetupScreen() {
               <div
                 key={diffHint ?? 'default'}
                 style={{
-                  fontFamily: "'DM Mono',monospace",
+                  fontFamily: "'Josefin Sans', sans-serif",
                   fontSize: '11px',
                   color: '#4b5563',
                   fontStyle: 'italic',
@@ -1562,7 +1568,7 @@ export default function SetupScreen() {
                     <div style={{ marginTop: '14px' }}>
                       <div
                         style={{
-                          fontFamily: "'DM Mono', monospace",
+                          fontFamily: "'Josefin Sans', sans-serif",
                           fontSize: '10px',
                           color: '#4b5563',
                           letterSpacing: '0.1em',
@@ -1583,7 +1589,7 @@ export default function SetupScreen() {
                           border: `1.5px solid ${jobDescription.trim() ? '#6366f155' : '#1c1c2a'}`,
                           borderRadius: '12px',
                           padding: '12px 14px',
-                          fontFamily: "'DM Mono', monospace",
+                          fontFamily: "'Josefin Sans', sans-serif",
                           fontSize: '12px',
                           color: '#d1d5db',
                           resize: 'vertical',
@@ -1598,7 +1604,7 @@ export default function SetupScreen() {
                         <div
                           style={{
                             marginTop: '6px',
-                            fontFamily: "'DM Mono', monospace",
+                            fontFamily: "'Josefin Sans', sans-serif",
                             fontSize: '10px',
                             color: '#4b556388',
                           }}
@@ -1613,7 +1619,7 @@ export default function SetupScreen() {
                     <div
                       style={{
                         marginTop: '10px',
-                        fontFamily: "'DM Mono',monospace",
+                        fontFamily: "'Josefin Sans', sans-serif",
                         fontSize: '10px',
                         color: '#2d2d40',
                         textAlign: 'center',
@@ -1628,7 +1634,7 @@ export default function SetupScreen() {
               {mode === 'generic' && (
                 <div
                   style={{
-                    fontFamily: "'DM Mono',monospace",
+                    fontFamily: "'Josefin Sans', sans-serif",
                     fontSize: '10px',
                     color: '#2d2d40',
                     paddingLeft: '2px',
@@ -1663,7 +1669,7 @@ export default function SetupScreen() {
                     ? `linear-gradient(135deg,#4338ca,#6366f1 50%,${selectedRole ? `${selectedRole.color}cc` : '#818cf8'})`
                     : '#111120',
                   color: '#fff',
-                  fontFamily: "'Syne',sans-serif",
+                  fontFamily: "'Josefin Sans', sans-serif",
                   fontSize: '15px',
                   fontWeight: '800',
                   letterSpacing: '0.02em',
@@ -1722,7 +1728,7 @@ export default function SetupScreen() {
               <div key={label} style={{ textAlign: 'center' }}>
                 <div
                   style={{
-                    fontFamily: "'Syne',sans-serif",
+                    fontFamily: "'Josefin Sans', sans-serif",
                     fontSize: '15px',
                     fontWeight: '800',
                     color: '#d1d5db',
@@ -1733,7 +1739,7 @@ export default function SetupScreen() {
                 </div>
                 <div
                   style={{
-                    fontFamily: "'DM Mono',monospace",
+                    fontFamily: "'Josefin Sans', sans-serif",
                     fontSize: '10px',
                     color: '#2d2d40',
                     textTransform: 'uppercase',

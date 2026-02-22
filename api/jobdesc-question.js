@@ -11,13 +11,13 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "GROQ_API_KEY is not configured" });
   }
 
-  const { resumeText, jobDescription, questionNumber, previousQuestions, candidateName } =
+  const { jobDescription, resumeText, candidateName, questionNumber, previousQuestions } =
     req.body ?? {};
 
-  if (!resumeText || !jobDescription) {
+  if (!jobDescription) {
     return res
       .status(400)
-      .json({ error: "resumeText and jobDescription are required" });
+      .json({ error: "jobDescription is required" });
   }
 
   const prevList =
@@ -29,21 +29,19 @@ export default async function handler(req, res) {
     ? `\nThe candidate's name is ${candidateName}. Address them by name naturally in the question.`
     : "";
 
-  const prompt = `You are a behavioral interview question generator. Given a candidate's resume and a job description, generate a single behavioral interview question that is highly relevant to both the candidate's background and the target role.
-
-Resume:
-${typeof resumeText === "string" ? resumeText.slice(0, 6000) : ""}
+  const prompt = `You are a behavioral interview question generator. Given a job description (and optionally a candidate's resume for context), generate a single behavioral interview question focused on the job description's requirements.
 
 Job Description:
 ${typeof jobDescription === "string" ? jobDescription.slice(0, 3000) : ""}
+${resumeText ? `\nCandidate Resume (for context only):\n${typeof resumeText === "string" ? resumeText.slice(0, 4000) : ""}` : ""}
 ${prevList}${nameInstruction}
 
 This is question number ${questionNumber || 1}.
 
 Generate ONE behavioral interview question. The question should:
-- START with a personal reference to something specific from the resume, e.g. "I noticed from your resume that you worked on X..." or "I see you have experience with Y..." — then transition into the behavioral question
-- Be specific to the candidate's experience mentioned in their resume
-- Be relevant to the skills or responsibilities in the job description
+- START with a brief company/role context from the job description using "At our company" (do NOT invent a company name). Example: "At our company, we work closely with cross-functional teams — tell me about a time when..."
+- Keep the company context lead-in under 15 words, then transition to the behavioral question
+- Be relevant to the skills, responsibilities, or values mentioned in the job description
 - Follow a behavioral format (e.g. "Tell me about a time when..." or "How did you handle...")
 - Be challenging but fair
 - Keep it concise but allow enough detail for context — aim for 25–50 words
@@ -75,7 +73,7 @@ Respond with JSON only: {"question": "...", "type": "behavioral", "focus": "brie
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error("[api/resume-question] Groq error", response.status, errText);
+      console.error("[api/jobdesc-question] Groq error", response.status, errText);
       return res.status(502).json({ error: "Groq API error" });
     }
 
@@ -86,7 +84,7 @@ Respond with JSON only: {"question": "...", "type": "behavioral", "focus": "brie
     try {
       parsed = JSON.parse(content);
     } catch {
-      console.error("[api/resume-question] JSON parse failed", content.slice(0, 300));
+      console.error("[api/jobdesc-question] JSON parse failed", content.slice(0, 300));
       return res.status(502).json({ error: "AI returned invalid JSON" });
     }
 
@@ -99,7 +97,7 @@ Respond with JSON only: {"question": "...", "type": "behavioral", "focus": "brie
     if (err && typeof err === "object" && err.name === "AbortError") {
       return res.status(504).json({ error: "Groq request timed out" });
     }
-    console.error("[api/resume-question] Error", String(err));
+    console.error("[api/jobdesc-question] Error", String(err));
     return res.status(500).json({ error: "Failed to generate question" });
   }
 }

@@ -181,11 +181,47 @@ export function useTTS() {
     }
   }, [cleanupAudio, fetchWithRetry, playBlob, speakWithNativeFallback]);
 
+  /** Speak multiple chunks back-to-back without dropping isPlaying state between them. */
+  const speakChunks = useCallback(async (chunks: string[], voiceOrOpts?: string | { voice?: string; speed?: number; instructions?: string; onStart?: () => void }, speed?: number) => {
+    if (chunks.length === 0) return;
+    if (chunks.length === 1) return speak(chunks[0], voiceOrOpts, speed);
+
+    const opts = typeof voiceOrOpts === 'object' ? voiceOrOpts : { voice: voiceOrOpts, speed };
+    cleanupAudio();
+    window.speechSynthesis?.cancel();
+
+    setIsPlaying(true);
+    const stopTimer = log.time('speakChunks');
+    try {
+      // Pre-fetch all chunks in parallel
+      const blobPromises = chunks.map((chunk) => fetchWithRetry(chunk, opts.voice, opts.speed, opts.instructions));
+      const blobs = await Promise.all(blobPromises);
+      log.info('All chunks fetched', { count: blobs.length });
+
+      // Play sequentially
+      for (let i = 0; i < blobs.length; i++) {
+        log.info(`Playing chunk ${i + 1}/${blobs.length}`);
+        await playBlob(blobs[i], i === 0 ? opts.onStart : undefined);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Playback interrupted') {
+        log.info('Chunk playback interrupted');
+        throw error;
+      }
+      log.error('Chunk TTS failed', { error: String(error) });
+      throw error;
+    } finally {
+      stopTimer();
+      setIsPlaying(false);
+      cleanupAudio();
+    }
+  }, [cleanupAudio, fetchWithRetry, playBlob, speak]);
+
   const stopPlayback = useCallback(() => {
     cleanupAudio();
     window.speechSynthesis?.cancel();
     setIsPlaying(false);
   }, [cleanupAudio]);
 
-  return { speak, isPlaying, stopPlayback, analyserNode };
+  return { speak, speakChunks, isPlaying, stopPlayback, analyserNode };
 }

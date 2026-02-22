@@ -144,11 +144,21 @@ export default function TypewriterQuestion({
       {/* Question text with typewriter effect */}
       <p
         style={{
+<<<<<<< HEAD
           marginTop: 0,
           marginBottom: 0,
           fontSize: '16px',
           lineHeight: 1.54,
           color: '#d7d7d7',
+=======
+          margin: 0,
+          fontFamily: "'Josefin Sans', sans-serif",
+          fontSize: 'clamp(16px, 2.2vw, 22px)',
+          fontWeight: 700,
+          lineHeight: 1.55,
+          letterSpacing: '-0.005em',
+          color: '#f0f0f5',
+>>>>>>> fbab13b941243522a507bcb3b2200d8482fba810
           minHeight: '1.55em',
         }}
       >
