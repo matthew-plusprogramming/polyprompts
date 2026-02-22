@@ -373,10 +373,6 @@ export default function InterviewScreen() {
       log.error('TTS error — continuing without audio', { error: String(e) });
     }
 
-    // Step 2.5: Brief "thinking" pause
-    setPhase('thinking');
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
     // Step 3: Start VAD + recorder
     setPhase('recording');
     setStatusText('Listening...');
@@ -448,10 +444,6 @@ export default function InterviewScreen() {
     } catch (e) {
       log.error('TTS error — continuing without audio', { error: String(e) });
     }
-
-    // Brief thinking pause
-    setPhase('thinking');
-    await new Promise(resolve => setTimeout(resolve, 1500));
 
     // Start recording for the next question
     setPhase('recording');
@@ -1435,8 +1427,8 @@ export default function InterviewScreen() {
           <div style={{ position: 'relative', zIndex: 1 }}>
             <TypewriterQuestion
               text={state.currentQuestion?.text ?? ''}
-              isTyping={phase === 'speaking-question'}
-              isComplete={phase !== 'speaking-question' && phase !== 'ready'}
+              isTyping={false}
+              isComplete={true}
               visible={phase === 'ready' || phase === 'speaking-question' || phase === 'thinking' || phase === 'recording' || phase === 'silence-detected' || phase === 'asking-done'}
               ttsSpeed={state.ttsSpeed}
             />

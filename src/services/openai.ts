@@ -65,18 +65,20 @@ export async function analyzePause(transcript: string): Promise<'definitely_done
     messages: [
       {
         role: 'system',
-        content: `You analyze an interview candidate's transcript after they paused for several seconds. Decide what to do next.
+        content: `You analyze an interview candidate's transcript after they paused. Decide what to do next.
 
-Return "definitely_done" if ANY of the following are true:
+Return "definitely_done" if you are ~70-80% confident the candidate has finished their answer. This includes:
 - The candidate explicitly signals they are finished (e.g. "I'm done", "that's it", "that's all", "that's my answer", "yeah that's about it", "I think that covers it")
-- The answer has a clear concluding statement (e.g. wrapping up with a result, lesson learned, or summary) AND covers substantial ground (50+ words with a complete narrative arc)
+- The answer has a concluding statement (wrapping up with a result, lesson learned, or summary) AND covers reasonable ground (30+ words)
+- The candidate has addressed the question and their last sentence feels like a natural stopping point
+- The transcript trails off after making a complete point, even without an explicit wrap-up
 
-Return "definitely_still_talking" ONLY if you are nearly 100% certain the candidate is mid-thought and will continue. This means:
-- The transcript ends mid-sentence, with an incomplete clause
+Return "definitely_still_talking" ONLY if you are confident the candidate is mid-thought:
+- The transcript ends mid-sentence with an incomplete clause
 - The last word is a conjunction or preposition (and, but, so, because, like, with, to, for, that, which)
-- The transcript is very short (under 20 words) and clearly just getting started
+- The transcript is very short (under 15 words) and clearly just getting started
 
-Return "ask" for EVERYTHING else. When in doubt, always return "ask". The interviewer will gently ask "Are you finished with your answer?" which is always a safe, supportive action. Err heavily toward "ask".`,
+Return "ask" when genuinely uncertain. But prefer "definitely_done" over "ask" if the answer seems substantially complete.`,
       },
       {
         role: 'user',
