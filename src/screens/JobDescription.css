@@ -98,16 +98,16 @@
 
 .job-description__field textarea {
   width: 100%;
-  min-height: 3.4rem;
-  max-height: 3.4rem;
+  min-height: 8rem;
+  max-height: 14rem;
   resize: none;
   overflow-y: auto;
   scrollbar-width: none;
-  border-radius: 999px;
+  border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.24);
   background: rgba(0, 0, 0, 0.72);
   color: #f2f2f2;
-  padding: 0.94rem 7.5rem 1.06rem 1.2rem;
+  padding: 1rem 1.2rem 3rem 1.2rem;
   font-size: 1rem;
   line-height: 1.4;
   box-sizing: border-box;
@@ -131,8 +131,7 @@
 .job-description__actions {
   position: absolute;
   right: 0.8rem;
-  top: 45%;
-  transform: translateY(-50%);
+  bottom: 0.6rem;
   display: flex;
   align-items: center;
   gap: 0.55rem;
@@ -330,10 +329,8 @@
   }
 
   .job-description__field textarea {
-    min-height: 3.2rem;
-    max-height: 3.2rem;
-    padding-right: 1rem;
-    padding-right: 6.6rem;
+    min-height: 7rem;
+    max-height: 12rem;
   }
 
   .job-description__dropzone {

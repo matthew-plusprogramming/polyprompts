@@ -278,9 +278,9 @@ export default function JobDescription() {
                 if (error) setError("");
               }}
               onKeyDown={handlePromptKeyDown}
-              placeholder="Type response"
+              placeholder="Paste or type the job description here..."
               aria-label="Job description prompt"
-              rows={1}
+              rows={4}
             />
             <div className="job-description__actions">
               <button

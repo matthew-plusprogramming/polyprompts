@@ -37,11 +37,12 @@ ${prevList}
 This is question number ${questionNumber || 1}.
 
 Generate ONE behavioral interview question. The question should:
+- START with a personal reference to something specific from the resume, e.g. "I noticed from your resume that you worked on X..." or "I see you have experience with Y..." — then transition into the behavioral question
 - Be specific to the candidate's experience mentioned in their resume
 - Be relevant to the skills or responsibilities in the job description
-- Follow the "Tell me about a time when..." or similar behavioral format
+- Follow a behavioral format (e.g. "Tell me about a time when..." or "How did you handle...")
 - Be challenging but fair
-- ONE sentence only. Keep it short and direct — under 25 words
+- Keep it concise but allow enough detail for context — aim for 25–50 words
 
 Respond with JSON only: {"question": "...", "type": "behavioral", "focus": "brief focus area"}`;
 

@@ -49,7 +49,7 @@ STRICT RULES:
 - Do NOT include explanations, conclusions, or preamble
 - Do NOT include phrases like "Sure!" or "Here is a question"
 - Do NOT include numbering
-- ONE sentence only. Keep it short and direct — under 25 words
+- Keep it concise but allow enough detail for context — aim for 20–40 words
 - A brief conversational lead-in like "Tell me about a time when..." is fine
 
 Previously asked questions:
@@ -59,7 +59,7 @@ Generate a NEW question that is different from the previous ones.`,
           },
         ],
         temperature: 0.8,
-        max_tokens: 150,
+        max_tokens: 250,
       }),
       signal: controller.signal,
     });
