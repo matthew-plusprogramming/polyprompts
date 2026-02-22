@@ -37,7 +37,7 @@ const guidedPhaseLabel: Record<GuidedPhase, string> = {
 export default function FeedbackScreen() {
   const { state, dispatch } = useInterview();
   const navigate = useNavigate();
-  const { speak, stopPlayback } = useTTS();
+  const { speak, stopPlayback, isPlaying: ttsPlaying } = useTTS();
 
   const questionResults = state.questionResults;
   const hasMultipleResults = questionResults.length > 0;
@@ -238,6 +238,21 @@ export default function FeedbackScreen() {
     setGuidedQuestionIdx(0);
   }, [state, feedbackResponse, speak, playClipAsync]);
 
+  // ─── Auto-play voice summary on mount ───
+  const hasPlayedSummaryRef = useRef(false);
+
+  useEffect(() => {
+    if (hasPlayedSummaryRef.current) return;
+    if (!state.voiceSummary || !feedbackResponse) return;
+    if (guidedPhase !== 'idle') return;
+
+    hasPlayedSummaryRef.current = true;
+    log.info('Auto-playing voice summary');
+    speak(state.voiceSummary, state.ttsVoice, state.ttsSpeed).catch((err) => {
+      log.warn('Voice summary playback failed', { error: String(err) });
+    });
+  }, [state.voiceSummary, feedbackResponse, guidedPhase, speak, state.ttsVoice, state.ttsSpeed]);
+
   // Cleanup guided review on unmount
   useEffect(() => {
     return () => {
@@ -408,7 +423,16 @@ export default function FeedbackScreen() {
       <div className="feedback__frame">
         <header className="feedback__header">
           <div>
-            <h1 className="feedback__title">Starly Summary</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <h1 className="feedback__title">Starly Summary</h1>
+              {ttsPlaying && guidedPhase === 'idle' && (
+                <div className="voice-summary-indicator">
+                  <div className="voice-summary-indicator__bar" />
+                  <div className="voice-summary-indicator__bar" />
+                  <div className="voice-summary-indicator__bar" />
+                </div>
+              )}
+            </div>
             {hasMultipleResults && (
               <p style={{ margin: 0, fontSize: '0.85rem', color: '#9e9e9e', letterSpacing: '0.06em' }}>
                 {questionResults.length} question{questionResults.length !== 1 ? 's' : ''} answered

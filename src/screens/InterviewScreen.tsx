@@ -5,7 +5,7 @@ import { useTTS } from '../hooks/useTTS';
 import { useDeepgramTranscription } from '../hooks/useDeepgramTranscription';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useFaceDetection } from '../hooks/useFaceDetection';
-import { analyzePause, prefetchTTS } from '../services/openai';
+import { analyzePause, prefetchTTS, generateVoiceSummary } from '../services/openai';
 import { getFeedback } from '../services/api';
 import { countFillers } from '../hooks/useFillerDetection';
 import type { QuestionResult, FeedbackResponse, OverallFeedback } from '../types';
@@ -619,6 +619,17 @@ export default function InterviewScreen() {
               createdAt: new Date().toISOString(),
             },
           });
+
+          // Fire voice summary generation + TTS prefetch in background (non-blocking)
+          generateVoiceSummary(feedbackResponse)
+            .then((summaryText) => {
+              prefetchTTS([summaryText], currentState.ttsVoice, currentState.ttsSpeed);
+              dispatch({ type: 'SET_VOICE_SUMMARY', payload: summaryText });
+              log.info('Voice summary ready', { length: summaryText.length });
+            })
+            .catch((err) => {
+              log.warn('Voice summary generation failed', { error: String(err) });
+            });
         } catch (err) {
           log.error('Scoring failed', { error: String(err) });
           backgroundScoringRef.current = [];

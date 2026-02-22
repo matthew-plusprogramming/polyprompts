@@ -78,6 +78,38 @@ export async function generateScriptResponse(
   return text;
 }
 
+// --- Voice Summary (post-interview debrief) ---
+export async function generateVoiceSummary(feedback: import('../types').FeedbackResponse): Promise<string> {
+  const stopTimer = log.time('generateVoiceSummary');
+  const openai = await getClient();
+  const { overall, questions } = feedback;
+
+  const questionSummaries = questions
+    .map((q, i) => `Q${i + 1}: score ${Math.round(q.score)}% — ${q.summary}`)
+    .join('\n');
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    temperature: 0.7,
+    max_tokens: 200,
+    messages: [
+      {
+        role: 'system',
+        content: `You are Starly, a friendly interview coach giving a brief spoken debrief after a practice interview. Keep it to 2-4 sentences. Mention the overall score, one key strength, one area to improve, then encourage the user to explore the guided review and detailed breakdown below for more. Be warm but concise — this will be read aloud via TTS.`,
+      },
+      {
+        role: 'user',
+        content: `Overall score: ${Math.round(overall.score)}%\nStrengths: ${overall.what_went_well}\nAreas to improve: ${overall.needs_improvement}\n\nPer-question summaries:\n${questionSummaries}`,
+      },
+    ],
+  });
+
+  const text = response.choices[0]?.message?.content?.trim() ?? '';
+  stopTimer();
+  log.info('Voice summary generated', { length: text.length });
+  return text;
+}
+
 // --- Pause Analysis ---
 // Returns:
 //   'definitely_done'          — auto-submit the answer (extremely high confidence)
