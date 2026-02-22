@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import starlyIcon from '../icons/StarlyLogo.png';
-import homePageBg from '../icons/HomePage.png';
+import starlyIcon from '../Icons/StarlyLogo.png';
+import homePageBg from '../Icons/HomePage.png';
 
 export default function HomeScreen() {
   const navigate = useNavigate();

@@ -11,7 +11,7 @@ const supabase = createClient(
  *
  * TODO: Implement Supabase query
  * - SELECT * FROM questions WHERE role = role AND difficulty = difficulty
- * - Fallback: import seededQuestions from ../data/questions and filter locally
+ * - Fallback: generate questions via AI API
  */
 export async function getQuestions(role: Role, difficulty: Difficulty): Promise<Question[]> {
   void role;

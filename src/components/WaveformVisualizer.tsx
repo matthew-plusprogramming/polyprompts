@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import starlyIcon from '../icons/STARLY.png';
+import starlyIcon from '../Icons/STARLY.png';
 
 type WaveformStatus = 'loading' | 'ready' | 'unsupported' | 'error';
 

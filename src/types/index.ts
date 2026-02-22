@@ -2,7 +2,6 @@ export type { FaceMetrics } from './faceDetection';
 
 export type Role = 'swe_intern' | 'pm_intern';
 export type Difficulty = 'easy' | 'medium' | 'hard';
-export type ScoreLevel = 'Getting Started' | 'Developing' | 'Solid' | 'Strong';
 
 export interface ResumeData {
   skills: string[];
@@ -19,33 +18,49 @@ export interface Question {
   category?: string;
 }
 
-export interface DimensionScore {
-  level: ScoreLevel;
-  explanation: string;
+// --- Feedback types (numeric 0-100 scoring) ---
+
+export interface QuestionFeedback {
+  score: number;  // avg of 6 categories, 0-100
+  best_part_quote: string;
+  best_part_explanation: string;
+  worst_part_quote: string;
+  worst_part_explanation: string;
+  what_went_well: string;
+  needs_improvement: string;
+  summary: string;
+  confidence_score: number | null;
 }
 
-export interface ScoringResult {
-  scores: {
-    situation: DimensionScore;
-    task: DimensionScore;
-    action: DimensionScore;
-    result: DimensionScore;
-    communication: DimensionScore;
-    pacing: DimensionScore;
-  };
-  suggestions: [string, string, string];
-  followUp: string;
-  overallSummary: string;
-  strongestDimension: string;
-  weakestDimension: string;
-  positiveCallouts: [string, string];
+export interface OverallFeedback {
+  score: number;
+  response_organization: number;
+  technical_knowledge: number;
+  problem_solving: number;
+  position_application: number;
+  timing: number;
+  personability: number;
+  what_went_well: string;
+  needs_improvement: string;
+  summary: string;
+}
+
+export interface FeedbackResponse {
+  questions: QuestionFeedback[];
+  overall: OverallFeedback;
+}
+
+export interface FactCheckResult {
+  is_correct: boolean;
+  result: string;
+  explanation: string;
 }
 
 export interface QuestionResult {
   question: Question;
   transcript: string;
   audioBlob?: Blob;
-  scoringResult: ScoringResult | null;  // null while scoring in background
+  feedback: QuestionFeedback | null;
   metrics: {
     fillerCount: number;
     wordsPerMinute: number;
@@ -59,7 +74,7 @@ export interface Session {
   questionId: string;
   attemptNumber: number;
   transcript: string;
-  scores: ScoringResult;
+  scores: FeedbackResponse;
   durationSeconds: number;
   createdAt: string;
 }
@@ -75,8 +90,8 @@ export interface InterviewState {
   liveTranscript: string;
   audioBlob: Blob | null;
   isScoring: boolean;
-  currentResult: ScoringResult | null;
-  previousAttempts: ScoringResult[];
+  feedbackResponse: FeedbackResponse | null;
+  previousAttempts: FeedbackResponse[];
   fillerCount: number;
   wordsPerMinute: number;
   speakingDurationSeconds: number;
@@ -93,7 +108,7 @@ export type InterviewAction =
   | { type: 'SET_QUESTION'; payload: Question }
   | { type: 'SET_QUESTIONS'; payload: Question[] }
   | { type: 'SAVE_QUESTION_RESULT'; payload: QuestionResult }
-  | { type: 'UPDATE_QUESTION_SCORING'; payload: { index: number; scoringResult: ScoringResult } }
+  | { type: 'UPDATE_QUESTION_FEEDBACK'; payload: { index: number; feedback: QuestionFeedback } }
   | { type: 'ADVANCE_QUESTION' }
   | { type: 'SET_RESUME_DATA'; payload: ResumeData }
   | { type: 'START_RECORDING' }
@@ -101,7 +116,7 @@ export type InterviewAction =
   | { type: 'UPDATE_TRANSCRIPT'; payload: string }
   | { type: 'UPDATE_METRICS'; payload: { fillerCount: number; wordsPerMinute: number; speakingDurationSeconds: number } }
   | { type: 'START_SCORING' }
-  | { type: 'SET_RESULT'; payload: ScoringResult }
+  | { type: 'SET_FEEDBACK_RESPONSE'; payload: FeedbackResponse }
   | { type: 'SET_TOTAL_DURATION'; payload: number }
   | { type: 'RETRY' }
   | { type: 'NEXT_QUESTION' }

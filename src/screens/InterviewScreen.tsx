@@ -5,10 +5,12 @@ import { useTTS } from '../hooks/useTTS';
 import { useDeepgramTranscription } from '../hooks/useDeepgramTranscription';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useFaceDetection } from '../hooks/useFaceDetection';
-import { analyzePause, scoreAnswer, prefetchTTS } from '../services/openai';
+import { analyzePause, prefetchTTS } from '../services/openai';
+import { getFeedback } from '../services/api';
 import { countFillers } from '../hooks/useFillerDetection';
 import type { QuestionResult } from '../types';
 import ParticleVisualizer from '../components/ParticleVisualizer';
+import TypewriterQuestion from '../components/TypewriterQuestion';
 import SilenceNudge from '../components/SilenceNudge';
 import cameraOnIcon from '../Icons/CameraOn.png';
 import cameraOffIcon from '../Icons/cameraOff.png';
@@ -77,7 +79,6 @@ export default function InterviewScreen() {
   const stateRef = useRef(state);
   stateRef.current = state;
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingScoringRef = useRef<Promise<void>[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
 
   const clearSilenceTimer = useCallback(() => {
@@ -465,12 +466,12 @@ export default function InterviewScreen() {
         return;
       }
 
-      // Save question result (scoring starts as null)
+      // Save question result (feedback is null until batch scoring at the end)
       const questionResult: QuestionResult = {
         question,
         transcript,
         audioBlob: blob ?? undefined,
-        scoringResult: null,
+        feedback: null,
         metrics: {
           fillerCount: countFillers(transcript),
           wordsPerMinute: currentState.wordsPerMinute,
@@ -481,12 +482,22 @@ export default function InterviewScreen() {
       dispatch({ type: 'SAVE_QUESTION_RESULT', payload: questionResult });
 
       if (isLastQuestion) {
-        // Final question: score synchronously, wait for all pending, then navigate
+        // Final question: batch score ALL questions at once
         dispatch({ type: 'START_SCORING' });
         try {
-          const result = await scoreAnswer(transcript, question.text, currentState.resumeData ?? undefined);
-          dispatch({ type: 'UPDATE_QUESTION_SCORING', payload: { index: currentIdx, scoringResult: result } });
-          dispatch({ type: 'SET_RESULT', payload: result });
+          // Collect all questions and answers (including the one we just saved)
+          const allResults = [...currentState.questionResults, questionResult];
+          const allQuestions = allResults.map(qr => qr.question.text);
+          const allAnswers = allResults.map(qr => qr.transcript);
+
+          const feedbackResponse = await getFeedback(allQuestions, allAnswers);
+
+          // Update each question result with its individual feedback
+          feedbackResponse.questions.forEach((qFeedback, idx) => {
+            dispatch({ type: 'UPDATE_QUESTION_FEEDBACK', payload: { index: idx, feedback: qFeedback } });
+          });
+
+          dispatch({ type: 'SET_FEEDBACK_RESPONSE', payload: feedbackResponse });
           dispatch({
             type: 'SAVE_SESSION',
             payload: {
@@ -494,7 +505,7 @@ export default function InterviewScreen() {
               questionId: question.id,
               attemptNumber: currentState.previousAttempts.length + 1,
               transcript,
-              scores: result,
+              scores: feedbackResponse,
               durationSeconds: totalDuration,
               createdAt: new Date().toISOString(),
             },
@@ -503,37 +514,10 @@ export default function InterviewScreen() {
           log.error('Scoring failed', { error: String(err) });
         }
 
-        // Wait for any pending background scoring to complete
-        await Promise.allSettled(pendingScoringRef.current);
-        pendingScoringRef.current = [];
-
         log.info('Navigating to feedback');
         navigate('/feedback');
       } else {
-        // Non-final question: fire background scoring, advance to next
-        const scoringPromise = (async () => {
-          try {
-            const result = await scoreAnswer(transcript, question.text, currentState.resumeData ?? undefined);
-            dispatch({ type: 'UPDATE_QUESTION_SCORING', payload: { index: currentIdx, scoringResult: result } });
-            dispatch({
-              type: 'SAVE_SESSION',
-              payload: {
-                id: crypto.randomUUID(),
-                questionId: question.id,
-                attemptNumber: currentState.previousAttempts.length + 1,
-                transcript,
-                scores: result,
-                durationSeconds: totalDuration,
-                createdAt: new Date().toISOString(),
-              },
-            });
-          } catch (err) {
-            log.error('Background scoring failed for Q' + (currentIdx + 1), { error: String(err) });
-          }
-        })();
-        pendingScoringRef.current.push(scoringPromise);
-
-        // Begin next question flow
+        // Non-final question: just advance to next (no per-question scoring)
         finishingRef.current = false;
         await beginNextQuestionRef.current();
         return;
@@ -1108,7 +1092,7 @@ export default function InterviewScreen() {
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
               {state.questions.map((_, i) => {
                 const result = state.questionResults[i];
-                const scored = result?.scoringResult != null;
+                const scored = result?.feedback != null;
                 return (
                   <div
                     key={i}
@@ -1362,47 +1346,16 @@ export default function InterviewScreen() {
 
           {/* ── Phase-specific overlays (matthew's logic) ── */}
 
-          {/* Speaking-question overlay */}
-          {phase === 'speaking-question' && (
-            <div
-              style={{
-                position: 'relative',
-                zIndex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                padding: '12px 24px',
-                marginBottom: '0.5rem',
-                background: 'rgba(167,139,250,0.07)',
-                border: '1px solid rgba(167,139,250,0.18)',
-                borderRadius: '14px',
-                animation: 'fadeIn 0.3s ease',
-              }}
-            >
-              <div
-                style={{
-                  width: '7px',
-                  height: '7px',
-                  borderRadius: '50%',
-                  background: '#a78bfa',
-                  flexShrink: 0,
-                  animation: 'pulse-ring 1.2s ease-out infinite',
-                }}
-              />
-              <span
-                style={{
-                  fontFamily: "'Space Grotesk', sans-serif",
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#c4b5fd',
-                  letterSpacing: '0.01em',
-                }}
-              >
-                Interviewer is asking your question aloud&hellip;
-              </span>
-            </div>
-          )}
+          {/* Typewriter question display — container always present, content fades in/out */}
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <TypewriterQuestion
+              text={state.currentQuestion?.text ?? ''}
+              isTyping={phase === 'speaking-question'}
+              isComplete={phase !== 'speaking-question' && phase !== 'ready'}
+              visible={phase === 'speaking-question' || phase === 'thinking' || phase === 'recording' || phase === 'silence-detected' || phase === 'asking-done'}
+              ttsSpeed={state.ttsSpeed}
+            />
+          </div>
 
           {/* Transitioning overlay */}
           {phase === 'transitioning' && (
@@ -1456,8 +1409,8 @@ export default function InterviewScreen() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '10px',
-                padding: '12px 24px',
-                marginBottom: '0.5rem',
+                padding: '8px 24px',
+                marginBottom: '0.25rem',
                 background: 'rgba(129,140,248,0.07)',
                 border: '1px solid rgba(129,140,248,0.18)',
                 borderRadius: '14px',
@@ -1477,7 +1430,7 @@ export default function InterviewScreen() {
               <span
                 style={{
                   fontFamily: "'Space Grotesk', sans-serif",
-                  fontSize: '14px',
+                  fontSize: '13px',
                   fontWeight: '600',
                   color: '#a5b4fc',
                   letterSpacing: '0.01em',
@@ -1594,7 +1547,7 @@ export default function InterviewScreen() {
                 Live Transcript
               </strong>
 
-              {/* Question display (compact) */}
+              {/* Question preview in ready state (full question shows via typewriter during interview) */}
               {state.currentQuestion && phase === 'ready' && (
                 <span style={{ fontSize: '0.75rem', color: '#94a3b8', maxWidth: '60%', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {state.currentQuestion.text}
