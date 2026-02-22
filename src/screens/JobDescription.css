@@ -73,23 +73,27 @@
   position: relative;
 }
 
+.job-description__field::before,
 .job-description__field::after {
   content: "";
   position: absolute;
-  left: 3.5%;
-  right: 3.5%;
-  bottom: -10px;
-  height: 22px;
+  top: 50%;
+  width: 88px;
+  height: 28px;
+  transform: translateY(-50%);
   border-radius: 999px;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(255, 255, 255, 0.32),
-    rgba(255, 255, 255, 0.04) 62%,
-    rgba(255, 255, 255, 0) 80%
-  );
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 80%);
   filter: blur(8px);
   pointer-events: none;
   z-index: 0;
+}
+
+.job-description__field::before {
+  left: -24px;
+}
+
+.job-description__field::after {
+  right: -24px;
 }
 
 .job-description__field textarea {
@@ -167,6 +171,11 @@
   background: #cbff70;
 }
 
+.job-description__submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .job-description__submit svg {
   width: 1rem;
   height: 1rem;
@@ -184,6 +193,122 @@
   margin: 0.75rem 0 0;
   color: #f6b2b2;
   font-size: 0.9rem;
+}
+
+.job-description__or {
+  display: grid;
+  place-items: center;
+  margin: 1rem 0 0.95rem;
+  opacity: 0.45;
+}
+
+.job-description__or span {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.job-description__dropzone {
+  border: 1px dashed rgba(255, 255, 255, 0.26);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  min-height: 88px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  gap: 0.12rem;
+  padding: 0.55rem 1rem 0.62rem;
+  cursor: pointer;
+}
+
+.job-description__dropzone:hover,
+.job-description__dropzone.is-dragging {
+  border-color: rgba(203, 255, 112, 0.78);
+  background: rgba(203, 255, 112, 0.08);
+  box-shadow: 0 0 0 1px rgba(203, 255, 112, 0.24), 0 10px 24px rgba(203, 255, 112, 0.08);
+}
+
+.job-description__dropzone.is-extracting {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.job-description__dropzone--loaded {
+  border-style: solid;
+  border-color: rgba(203, 255, 112, 0.4);
+  background: rgba(203, 255, 112, 0.04);
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+}
+
+.job-description__dropzone-loaded-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.job-description__dropzone-remove {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  padding: 0.25rem 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.job-description__dropzone-remove:hover {
+  border-color: rgba(248, 113, 113, 0.5);
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.job-description__dropzone p {
+  margin: 0;
+  font-family: 'Syne', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #f0f3f7;
+}
+
+.job-description__dropzone-icon {
+  width: 50px;
+  height: 50px;
+  object-fit: contain;
+  margin-bottom: 0.04rem;
+  opacity: 0.96;
+  filter: grayscale(1) brightness(0) invert(1);
+}
+
+.job-description__dropzone span {
+  margin: 0;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: rgba(240, 244, 248, 0.7);
+}
+
+.job-description__dropzone strong {
+  margin-top: 0.25rem;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  color: #cbff70;
+  max-width: min(84vw, 520px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.job-description__dropzone-input {
+  display: none;
 }
 
 @media (max-width: 640px) {
@@ -209,6 +334,10 @@
     max-height: 3.2rem;
     padding-right: 1rem;
     padding-right: 6.6rem;
+  }
+
+  .job-description__dropzone {
+    min-height: 82px;
   }
 }
 
