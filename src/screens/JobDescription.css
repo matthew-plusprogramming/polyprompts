@@ -1,0 +1,231 @@
+.job-description {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background: #000;
+  color: #f5f5f5;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.job-description::before,
+.job-description::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(2.6px 2.6px at 18px 24px, rgba(255, 255, 255, 0.85), transparent 72%),
+    radial-gradient(1.8px 1.8px at 62px 96px, rgba(255, 255, 255, 0.72), transparent 72%),
+    radial-gradient(2.2px 2.2px at 120px 44px, rgba(255, 255, 255, 0.82), transparent 72%),
+    radial-gradient(1.6px 1.6px at 176px 120px, rgba(255, 255, 255, 0.66), transparent 72%),
+    radial-gradient(2.9px 2.9px at 216px 34px, rgba(255, 255, 255, 0.9), transparent 72%),
+    radial-gradient(2px 2px at 260px 168px, rgba(255, 255, 255, 0.74), transparent 72%),
+    radial-gradient(1.7px 1.7px at 310px 78px, rgba(255, 255, 255, 0.68), transparent 72%);
+  background-size: 220px 170px;
+  opacity: 0.4;
+  filter: drop-shadow(0 0 7px rgba(255, 255, 255, 0.3));
+  animation: jobStarTwinkle 3s ease-in-out infinite;
+}
+
+.job-description::after {
+  background-size: 300px 230px;
+  opacity: 0.24;
+  animation-duration: 7s;
+  animation-delay: -2.2s;
+}
+
+.job-description__logo {
+  position: absolute;
+  top: 1.4rem;
+  left: 1.6rem;
+  height: 52px;
+  width: auto;
+  z-index: 3;
+  object-fit: contain;
+}
+
+.job-description__panel {
+  width: min(900px, 100%);
+  padding: 1.5rem 0;
+  border-radius: 20px;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  position: relative;
+  z-index: 2;
+  transform: translateY(-3.5rem);
+}
+
+.job-description__panel h1 {
+  margin: 0 0 1rem;
+  font-size: clamp(1.35rem, 2.2vw, 2rem);
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.2;
+  max-width: 900px;
+}
+
+.job-description__field {
+  position: relative;
+}
+
+.job-description__field::after {
+  content: "";
+  position: absolute;
+  left: 3.5%;
+  right: 3.5%;
+  bottom: -10px;
+  height: 22px;
+  border-radius: 999px;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 255, 255, 0.32),
+    rgba(255, 255, 255, 0.04) 62%,
+    rgba(255, 255, 255, 0) 80%
+  );
+  filter: blur(8px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.job-description__field textarea {
+  width: 100%;
+  min-height: 3.4rem;
+  max-height: 3.4rem;
+  resize: none;
+  overflow-y: auto;
+  scrollbar-width: none;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(0, 0, 0, 0.72);
+  color: #f2f2f2;
+  padding: 0.94rem 7.5rem 1.06rem 1.2rem;
+  font-size: 1rem;
+  line-height: 1.4;
+  box-sizing: border-box;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 12px 22px rgba(255, 255, 255, 0.08);
+  position: relative;
+  z-index: 1;
+}
+
+.job-description__field textarea::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.job-description__field textarea:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.38);
+}
+
+.job-description__actions {
+  position: absolute;
+  right: 0.8rem;
+  top: 45%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  z-index: 2;
+}
+
+.job-description__voice,
+.job-description__submit {
+  border: none;
+  border-radius: 12px;
+  height: 2.1rem;
+}
+
+.job-description__voice {
+  width: 2.1rem;
+  display: grid;
+  place-items: center;
+  background: #141414;
+}
+
+.job-description__voice--active {
+  background: #141414;
+}
+
+.job-description__voice img {
+  width: 1rem;
+  height: 1rem;
+  object-fit: contain;
+}
+
+.job-description__submit {
+  width: 2.1rem;
+  display: grid;
+  place-items: center;
+  color: #0a0a0a;
+  background: #cbff70;
+}
+
+.job-description__submit svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.job-description__submit path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.job-description__error {
+  margin: 0.75rem 0 0;
+  color: #f6b2b2;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .job-description {
+    padding: 1rem 1rem 0;
+    align-content: start;
+    place-items: start center;
+  }
+
+  .job-description__logo {
+    top: 0.9rem;
+    left: 1rem;
+    height: 42px;
+  }
+
+  .job-description__panel {
+    padding: 4rem 0 1rem;
+    transform: translateY(0);
+  }
+
+  .job-description__field textarea {
+    min-height: 3.2rem;
+    max-height: 3.2rem;
+    padding-right: 1rem;
+    padding-right: 6.6rem;
+  }
+}
+
+@keyframes jobStarTwinkle {
+  0% {
+    opacity: 0.2;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 0.42;
+  }
+  70% {
+    opacity: 0.28;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 0.22;
+    transform: translateY(0);
+  }
+}
