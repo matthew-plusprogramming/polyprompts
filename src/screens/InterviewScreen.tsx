@@ -566,7 +566,10 @@ export default function InterviewScreen() {
           const allQuestions = allResults.map(qr => qr.question.text);
           const allAnswers = allResults.map(qr => qr.transcript);
 
-          const feedbackResponse = await getFeedback(allQuestions, allAnswers);
+          const feedbackResponse = await getFeedback(allQuestions, allAnswers, {
+            resumeText: currentState.resumeText ?? undefined,
+            jobDescription: currentState.jobDescription ?? undefined,
+          });
 
           // Update each question result with its individual feedback
           feedbackResponse.questions.forEach((qFeedback, idx) => {

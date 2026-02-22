@@ -335,22 +335,62 @@ function CategoryChip({ cat, selected, onClick }: { cat: (typeof CATEGORIES)[num
 /* ─────────────────────────────────────────────
    RESUME UPLOAD ZONE
 ───────────────────────────────────────────── */
-interface ResumeData {
+interface ResumeResult {
   name: string;
-  skills: string[];
-  experiences: string[];
-  education: string;
+  text: string;
+}
+
+// Dynamically load pdf.js from CDN
+let pdfJsLoaded = false;
+function loadPdfJs(): Promise<void> {
+  if (pdfJsLoaded && (window as any).pdfjsLib) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    script.onload = () => {
+      const lib = (window as any).pdfjsLib;
+      if (lib) {
+        lib.GlobalWorkerOptions.workerSrc =
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        pdfJsLoaded = true;
+        resolve();
+      } else {
+        reject(new Error('pdf.js failed to load'));
+      }
+    };
+    script.onerror = () => reject(new Error('Failed to load pdf.js from CDN'));
+    document.head.appendChild(script);
+  });
+}
+
+async function extractPDFText(file: File): Promise<string> {
+  await loadPdfJs();
+  const lib = (window as any).pdfjsLib;
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await lib.getDocument({ data: arrayBuffer }).promise;
+  const pages: string[] = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const text = content.items.map((item: any) => item.str).join(' ');
+    pages.push(text);
+  }
+  const fullText = pages.join('\n');
+  if (!fullText.trim()) {
+    throw new Error('No text found — this may be a scanned/image PDF. Please use a text-based PDF.');
+  }
+  return fullText;
 }
 
 function ResumeUpload({
   resumeFile,
-  resumeData,
+  resumeResult,
   onFileAccepted,
   onRemove,
 }: {
   resumeFile: File | null;
-  resumeData: ResumeData | null;
-  onFileAccepted: (file: File, data: ResumeData) => void;
+  resumeResult: ResumeResult | null;
+  onFileAccepted: (file: File, result: ResumeResult) => void;
   onRemove: () => void;
 }) {
   const [dragging, setDragging] = useState(false);
@@ -374,34 +414,43 @@ function ResumeUpload({
     []
   );
 
-  const fakeExtract = (file: File) => {
+  const realExtract = (file: File) => {
     setScanning(true);
     setScanPct(0);
     setError(null);
     let pct = 0;
 
+    // Animate progress bar while extraction happens
     scanRef.current = window.setInterval(() => {
-      pct += Math.random() * 18 + 4;
-      if (pct >= 100) {
-        pct = 100;
-        if (scanRef.current !== null) window.clearInterval(scanRef.current);
+      pct += Math.random() * 8 + 2;
+      if (pct > 90) pct = 90; // cap at 90% until extraction finishes
+      setScanPct(Math.min(pct, 90));
+    }, 100);
 
+    const isPdf = file.name.match(/\.pdf$/i);
+
+    const extractPromise = isPdf
+      ? extractPDFText(file)
+      : file.text(); // .txt / .doc fallback
+
+    extractPromise
+      .then((text) => {
+        if (scanRef.current !== null) window.clearInterval(scanRef.current);
         setScanPct(100);
         setTimeout(() => {
           setScanning(false);
           onFileAccepted(file, {
             name: file.name.replace(/\.[^/.]+$/, ''),
-            skills: ['React', 'Python', 'Node.js', 'SQL'].slice(0, 2 + Math.floor(Math.random() * 3)),
-            experiences: ['Software Engineering Intern', 'Research Assistant', 'Hackathon Winner'].slice(
-              0,
-              1 + Math.floor(Math.random() * 2)
-            ),
-            education: 'Cal Poly SLO · CS',
+            text,
           });
         }, 350);
-      }
-      setScanPct(Math.min(pct, 100));
-    }, 90);
+      })
+      .catch((err) => {
+        if (scanRef.current !== null) window.clearInterval(scanRef.current);
+        setScanning(false);
+        setScanPct(0);
+        setError(err instanceof Error ? err.message : 'Failed to extract text from file.');
+      });
   };
 
   const accept = useCallback(
@@ -414,7 +463,7 @@ function ResumeUpload({
         setError('File too large — max 5 MB.');
         return;
       }
-      fakeExtract(file);
+      realExtract(file);
     },
     [onFileAccepted]
   );
@@ -433,7 +482,7 @@ function ResumeUpload({
     return '📄';
   };
 
-  if (resumeFile && resumeData && !scanning) {
+  if (resumeFile && resumeResult && !scanning) {
     return (
       <div
         style={{
@@ -545,13 +594,22 @@ function ResumeUpload({
               marginBottom: '10px',
             }}
           >
-            Extracted highlights
+            Extracted text preview
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <HighlightRow icon="🎓" label="Education" value={resumeData.education} color="#22d3ee" />
-            <HighlightRow icon="💼" label="Experience" value={resumeData.experiences.join(', ')} color="#f59e0b" />
-            <HighlightRow icon="⚡" label="Skills" value={resumeData.skills.join(', ')} color="#a78bfa" />
+          <div
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: '11px',
+              color: '#6b7280',
+              lineHeight: 1.5,
+              maxHeight: '80px',
+              overflow: 'hidden',
+              WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)',
+              maskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)',
+            }}
+          >
+            {resumeResult.text.slice(0, 400)}
           </div>
 
           <div
@@ -786,16 +844,6 @@ function ResumeUpload({
           {error}
         </div>
       )}
-    </div>
-  );
-}
-
-function HighlightRow({ icon, label, value, color }: { icon: string; label: string; value: string; color: string }) {
-  return (
-    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-      <span style={{ fontSize: '12px', marginTop: '1px' }}>{icon}</span>
-      <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '11px', color: '#4b5563', minWidth: '70px' }}>{label}</div>
-      <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '11px', color: `${color}cc`, flex: 1, lineHeight: 1.4 }}>{value}</div>
     </div>
   );
 }
@@ -1101,7 +1149,8 @@ export default function SetupScreen() {
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]['id']>('random');
   const [mode, setMode] = useState<Mode>('generic');
   const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const [resumeData, setResumeData] = useState<ResumeData | null>(null);
+  const [resumeResult, setResumeResult] = useState<ResumeResult | null>(null);
+  const [jobDescription, setJobDescription] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [launching, setLaunching] = useState(false);
@@ -1114,7 +1163,7 @@ export default function SetupScreen() {
 
   const selectedRole = ROLES.find((r) => r.id === role);
   const selectedDiff = DIFFICULTIES.find((d) => d.id === difficulty);
-  const canStart = Boolean(role) && (mode === 'generic' || (mode === 'resume' && resumeData));
+  const canStart = Boolean(role) && (mode === 'generic' || (mode === 'resume' && resumeResult && jobDescription.trim()));
 
   const toInterviewRole = (uiRole: UiRole): Role => {
     if (uiRole === 'pm') return 'pm_intern';
@@ -1124,17 +1173,24 @@ export default function SetupScreen() {
   const handleStart = async () => {
     if (!canStart || launching || !role) return;
     setLaunching(true);
-    log.info('Interview starting', { role, difficulty, category, mode, hasResume: !!resumeData });
+    log.info('Interview starting', { role, difficulty, category, mode, hasResume: !!resumeResult });
 
     const mappedRole = toInterviewRole(role);
     dispatch({ type: 'SET_ROLE', payload: mappedRole });
     dispatch({ type: 'SET_DIFFICULTY', payload: difficulty });
+
+    // Dispatch resume context if in resume mode
+    if (mode === 'resume' && resumeResult && jobDescription.trim()) {
+      dispatch({ type: 'SET_RESUME_TEXT', payload: resumeResult.text });
+      dispatch({ type: 'SET_JOB_DESCRIPTION', payload: jobDescription.trim() });
+    }
 
     try {
       const questions = await loadQuestions({
         role: mappedRole,
         difficulty,
         count: 2,
+        ...(mode === 'resume' && resumeResult ? { resumeText: resumeResult.text, jobDescription: jobDescription.trim() } : {}),
       });
 
       log.info('Questions loaded', { count: questions.length, ids: questions.map(q => q.id) });
@@ -1163,17 +1219,17 @@ export default function SetupScreen() {
     transition: `opacity 0.5s ease ${i * 0.065}s, transform 0.55s cubic-bezier(0.34,1.56,0.64,1) ${i * 0.065}s`,
   });
 
-  const handleFileAccepted = (file: File, data: ResumeData) => {
+  const handleFileAccepted = (file: File, result: ResumeResult) => {
     setResumeFile(file);
-    setResumeData(data);
+    setResumeResult(result);
   };
 
   const handleRemove = () => {
     setResumeFile(null);
-    setResumeData(null);
+    setResumeResult(null);
   };
 
-  const progressItems = [role, 'diff', 'cat', mode === 'resume' ? (resumeData ? 'done' : null) : 'skip'];
+  const progressItems = [role, 'diff', 'cat', mode === 'resume' ? (resumeResult && jobDescription.trim() ? 'done' : null) : 'skip'];
 
   return (
     <>
@@ -1442,7 +1498,7 @@ export default function SetupScreen() {
 
               <div
                 style={{
-                  maxHeight: mode === 'resume' ? '600px' : '0px',
+                  maxHeight: mode === 'resume' ? '900px' : '0px',
                   overflow: 'hidden',
                   transition: 'max-height 0.4s cubic-bezier(0.4,0,0.2,1)',
                 }}
@@ -1450,12 +1506,63 @@ export default function SetupScreen() {
                 <div style={{ paddingTop: '2px', paddingBottom: '2px' }}>
                   <ResumeUpload
                     resumeFile={resumeFile}
-                    resumeData={resumeData}
+                    resumeResult={resumeResult}
                     onFileAccepted={handleFileAccepted}
                     onRemove={handleRemove}
                   />
 
-                  {mode === 'resume' && !resumeData && (
+                  {resumeResult && (
+                    <div style={{ marginTop: '14px' }}>
+                      <div
+                        style={{
+                          fontFamily: "'DM Mono', monospace",
+                          fontSize: '10px',
+                          color: '#4b5563',
+                          letterSpacing: '0.1em',
+                          textTransform: 'uppercase',
+                          marginBottom: '8px',
+                        }}
+                      >
+                        Job Description
+                      </div>
+                      <textarea
+                        value={jobDescription}
+                        onChange={(e) => setJobDescription(e.target.value)}
+                        placeholder="Paste the job description here..."
+                        rows={4}
+                        style={{
+                          width: '100%',
+                          background: 'rgba(255,255,255,0.02)',
+                          border: `1.5px solid ${jobDescription.trim() ? '#6366f155' : '#1c1c2a'}`,
+                          borderRadius: '12px',
+                          padding: '12px 14px',
+                          fontFamily: "'DM Mono', monospace",
+                          fontSize: '12px',
+                          color: '#d1d5db',
+                          resize: 'vertical',
+                          outline: 'none',
+                          transition: 'border-color 0.2s',
+                          lineHeight: 1.5,
+                        }}
+                        onFocus={(e) => { e.currentTarget.style.borderColor = '#6366f177'; }}
+                        onBlur={(e) => { e.currentTarget.style.borderColor = jobDescription.trim() ? '#6366f155' : '#1c1c2a'; }}
+                      />
+                      {!jobDescription.trim() && (
+                        <div
+                          style={{
+                            marginTop: '6px',
+                            fontFamily: "'DM Mono', monospace",
+                            fontSize: '10px',
+                            color: '#4b556388',
+                          }}
+                        >
+                          Required — helps AI tailor questions to the target role
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {mode === 'resume' && !resumeResult && (
                     <div
                       style={{
                         marginTop: '10px',
@@ -1540,9 +1647,11 @@ export default function SetupScreen() {
                     <span>
                       {!role
                         ? 'Select a role to begin'
-                        : mode === 'resume' && !resumeData
+                        : mode === 'resume' && !resumeResult
                           ? 'Upload your resume to continue'
-                          : 'Start Interview'}
+                          : mode === 'resume' && !jobDescription.trim()
+                            ? 'Paste a job description to continue'
+                            : 'Start Interview'}
                     </span>
                     {canStart && <span style={{ fontSize: '17px' }}>→</span>}
                   </>
