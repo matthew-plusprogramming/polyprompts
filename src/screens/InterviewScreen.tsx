@@ -13,6 +13,7 @@ import SilenceNudge from '../components/SilenceNudge';
 import cameraOnIcon from '../Icons/CameraOn.png';
 import cameraOffIcon from '../Icons/cameraOff.png';
 import starlyIcon from '../Icons/StarlyLogo.png';
+import starlyWordmark from '../Icons/STARLY.png';
 import { createLogger, setSessionId } from '../utils/logger';
 
 const log = createLogger('Interview');
@@ -661,8 +662,21 @@ export default function InterviewScreen() {
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   }, [elapsedSeconds]);
 
-  // Visualizer reacts to TTS audio (via analyserNode) and treats both user speech and TTS playback as "speaking"
-  const visualizerSpeaking = userSpeaking || ttsPlaying;
+  // ─── Particle energy for wordmark overlay ───
+  const [particleEnergy, setParticleEnergy] = useState(0);
+  const lastEnergyUpdateRef = useRef(0);
+  const normalizedEnergy = useMemo(() => Math.min(1, Math.max(0, particleEnergy * 2.4)), [particleEnergy]);
+
+  // Visualizer reacts only to TTS audio (interviewer speaking) — stays quiet while the user answers
+  const visualizerSpeaking = ttsPlaying;
+  const activeEnergy = visualizerSpeaking ? normalizedEnergy : 0;
+
+  const handleParticleEnergy = useCallback((energy: number) => {
+    const now = performance.now();
+    if (now - lastEnergyUpdateRef.current < 70) return;
+    lastEnergyUpdateRef.current = now;
+    setParticleEnergy(energy);
+  }, []);
 
   // ─── Phase badge config ───
   // ─── Question progress indicator ───
@@ -789,6 +803,14 @@ export default function InterviewScreen() {
             animation: btn-shimmer-anim 2.8s ease-in-out infinite;
           }
           @keyframes btn-shimmer-anim { 0% { left: -100%; } 60%, 100% { left: 150%; } }
+          @keyframes starlyFlow {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+          }
+          @keyframes starlyGlow {
+            0%, 100% { filter: invert(1) brightness(1.25) drop-shadow(0 0 12px rgba(255, 255, 255, 0.4)) drop-shadow(0 0 26px rgba(180, 210, 255, 0.25)); }
+            50% { filter: invert(1) brightness(1.45) drop-shadow(0 0 15px rgba(255, 255, 255, 0.62)) drop-shadow(0 0 36px rgba(190, 220, 255, 0.42)); }
+          }
         `}
       </style>
 
@@ -1308,8 +1330,32 @@ export default function InterviewScreen() {
                 boxShadow: 'inset 0 0 26px rgba(255, 255, 255, 0.05), 0 10px 24px rgba(0, 0, 0, 0.35)',
               }}
             >
-              <div style={{ width: '100%', height: '100%', flex: '1 1 auto', minHeight: 0 }}>
-                <ParticleVisualizer analyserNode={ttsAnalyserNode} isSpeaking={visualizerSpeaking} />
+              <div style={{ width: '100%', height: '100%', flex: '1 1 auto', minHeight: 0, position: 'relative' }}>
+                <ParticleVisualizer analyserNode={ttsAnalyserNode} isSpeaking={visualizerSpeaking} onEnergyChange={handleParticleEnergy} />
+                <img
+                  src={starlyWordmark}
+                  alt="STARLY"
+                  style={{
+                    position: 'absolute',
+                    left: '50%',
+                    top: '50%',
+                    zIndex: 5,
+                    width: '100px',
+                    height: 'auto',
+                    objectFit: 'contain',
+                    pointerEvents: 'none',
+                    opacity: 0.54 + activeEnergy * 0.2,
+                    filter: `invert(1) brightness(${(1.2 + activeEnergy * 0.36).toFixed(3)}) drop-shadow(0 0 ${Math.round(8 + activeEnergy * 12)}px rgba(255, 255, 255, 0.52)) drop-shadow(0 0 ${Math.round(20 + activeEnergy * 30)}px rgba(180, 210, 255, 0.34))`,
+                    mixBlendMode: 'screen',
+                    transformOrigin: '50% 50%',
+                    backfaceVisibility: 'hidden',
+                    willChange: 'transform, filter, opacity',
+                    transition: 'opacity 160ms linear, filter 180ms linear',
+                    animation: 'starlyFlow 7.2s linear infinite, starlyGlow 1.8s ease-in-out infinite',
+                    animationPlayState: visualizerSpeaking ? 'running' : 'paused',
+                    animationFillMode: 'both',
+                  }}
+                />
               </div>
             </section>
           </div>
