@@ -78,7 +78,7 @@ export async function loadQuestions(config: QuestionLoadConfig): Promise<Questio
       text = result.question;
       category = result.type || 'behavioral';
     } else {
-      text = await generateQuestion(role, i + 1, previousQuestions);
+      text = await generateQuestion(role, i + 1, previousQuestions, jobDescription);
     }
 
     // Similarity guard: if this question is too similar to a previous one, regenerate
@@ -97,7 +97,7 @@ export async function loadQuestions(config: QuestionLoadConfig): Promise<Questio
           text = result.question;
           category = result.type || 'behavioral';
         } else {
-          text = await generateQuestion(role, i + 1, strengthenedPrev);
+          text = await generateQuestion(role, i + 1, strengthenedPrev, jobDescription);
         }
         attempts++;
       }

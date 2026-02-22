@@ -7,12 +7,13 @@ export async function generateQuestion(
   role: string,
   questionNumber: number,
   previousQuestions: string[],
+  jobDescription?: string,
 ): Promise<string> {
   const stopTimer = log.time('generateQuestion');
   const res = await fetch('/api/question', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ role, questionNumber, previousQuestions }),
+    body: JSON.stringify({ role, questionNumber, previousQuestions, ...(jobDescription ? { jobDescription } : {}) }),
   });
 
   if (!res.ok) {
