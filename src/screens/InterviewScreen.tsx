@@ -20,6 +20,9 @@ import { createLogger, setSessionId } from '../utils/logger';
 
 const log = createLogger('Interview');
 
+const INTERVIEW_TTS_INSTRUCTIONS = 'Casual American female voice. Relaxed, steady pacing with natural micro-pauses between phrases. Slight upward inflection when asking questions. No vocal fry. Do not sound like a narrator or announcer — sound like a real person talking across a table.';
+const FEEDBACK_TTS_INSTRUCTIONS = 'Calm, measured delivery. Speak like a thoughtful coach giving a one-on-one debrief — unhurried, direct, matter-of-fact. Pause briefly before key advice. No cheerfulness or hype.';
+
 // ─── Phase state machine ───
 type ScreenPhase =
   | 'ready'
@@ -372,7 +375,7 @@ export default function InterviewScreen() {
     setPhase('speaking-question');
     setStatusText('Reading question aloud...');
     try {
-      await speak(state.currentQuestion.text, state.ttsVoice, state.ttsSpeed);
+      await speak(state.currentQuestion.text, { voice: state.ttsVoice, speed: 1.0, instructions: INTERVIEW_TTS_INSTRUCTIONS });
     } catch (e) {
       log.error('TTS error — continuing without audio', { error: String(e) });
     }
@@ -449,7 +452,7 @@ export default function InterviewScreen() {
     setPhase('transitioning');
     setStatusText('Moving to next question...');
     try {
-      await speak("Great, let's move on to the next question.", state.ttsVoice, state.ttsSpeed);
+      await speak("Great, let's move on to the next question.", { voice: state.ttsVoice, speed: 1.0, instructions: INTERVIEW_TTS_INSTRUCTIONS });
     } catch (e) {
       log.warn('Transition TTS failed', { error: String(e) });
     }
@@ -458,7 +461,7 @@ export default function InterviewScreen() {
     setPhase('speaking-question');
     setStatusText('Reading question aloud...');
     try {
-      await speak(nextQuestion.text, state.ttsVoice, state.ttsSpeed);
+      await speak(nextQuestion.text, { voice: state.ttsVoice, speed: 1.0, instructions: INTERVIEW_TTS_INSTRUCTIONS });
     } catch (e) {
       log.error('TTS error — continuing without audio', { error: String(e) });
     }
@@ -638,7 +641,7 @@ export default function InterviewScreen() {
           // Fire voice summary generation + TTS prefetch in background (non-blocking)
           generateVoiceSummary(feedbackResponse)
             .then((summaryText) => {
-              prefetchTTS([summaryText], currentState.ttsVoice, currentState.ttsSpeed);
+              prefetchTTS([summaryText], currentState.ttsVoice, 1.0, FEEDBACK_TTS_INSTRUCTIONS);
               dispatch({ type: 'SET_VOICE_SUMMARY', payload: summaryText });
               log.info('Voice summary ready', { length: summaryText.length });
             })
@@ -734,7 +737,7 @@ export default function InterviewScreen() {
       "Are you finished, or would you like to keep going?",
     ];
     if (nextQuestion) texts.push(nextQuestion.text);
-    prefetchTTS(texts, state.ttsVoice, state.ttsSpeed);
+    prefetchTTS(texts, state.ttsVoice, 1.0, INTERVIEW_TTS_INSTRUCTIONS);
   }, [phase, state.currentQuestionIndex, state.questions, state.ttsVoice, state.ttsSpeed]);
 
   // Keep context transcript in sync

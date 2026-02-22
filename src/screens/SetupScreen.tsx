@@ -9,6 +9,8 @@ import { createLogger } from '../utils/logger';
 
 const log = createLogger('Setup');
 
+const INTERVIEW_TTS_INSTRUCTIONS = 'Casual American female voice. Relaxed, steady pacing with natural micro-pauses between phrases. Slight upward inflection when asking questions. No vocal fry. Do not sound like a narrator or announcer — sound like a real person talking across a table.';
+
 /* ─────────────────────────────────────────────
    DATA
 ───────────────────────────────────────────── */
@@ -1193,7 +1195,7 @@ export default function SetupScreen() {
       const textsToCache = questions.map(q => q.text);
       if (questions.length > 1) textsToCache.push("Great, let's move on to the next question.");
       textsToCache.push("Are you finished, or would you like to keep going?");
-      prefetchTTS(textsToCache);
+      prefetchTTS(textsToCache, 'marin', 1.0, INTERVIEW_TTS_INSTRUCTIONS);
     }).catch(() => { /* will retry in handleStart */ });
   }, [role, difficulty, mode, resumeResult, jobDescription]);
 
@@ -1247,12 +1249,12 @@ export default function SetupScreen() {
           textsToCache.push("Great, let's move on to the next question.");
         }
         textsToCache.push("Are you finished, or would you like to keep going?");
-        prefetchTTS(textsToCache);
+        prefetchTTS(textsToCache, 'marin', 1.0, INTERVIEW_TTS_INSTRUCTIONS);
       } else {
         log.warn('No questions matched filters', { role: mappedRole, difficulty, category });
       }
       // Prefetch pre-interview script TTS alongside question TTS
-      prefetchTTS(getPreInterviewPrefetchTexts());
+      prefetchTTS(getPreInterviewPrefetchTexts(), 'marin', 1.0);
       navigate('/pre-interview');
     } catch (err) {
       console.error('[SetupScreen] Failed to load questions:', err);
