@@ -115,7 +115,7 @@ export default function HomeScreen() {
 
           <button
             type="button"
-            onClick={() => navigate('/setup')}
+            onClick={() => navigate('/job-description')}
             style={{
               marginTop: '22px',
               border: 'none',

@@ -1253,7 +1253,7 @@ export default function SetupScreen() {
       }
       // Prefetch pre-interview script TTS alongside question TTS
       prefetchTTS(getPreInterviewPrefetchTexts());
-      navigate('/pre-interview');
+      navigate('/job-description');
     } catch (err) {
       console.error('[SetupScreen] Failed to load questions:', err);
       setLaunching(false);
