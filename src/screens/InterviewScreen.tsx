@@ -1357,89 +1357,55 @@ export default function InterviewScreen() {
             />
           </div>
 
-          {/* Transitioning overlay */}
-          {phase === 'transitioning' && (
+          {/* Status banner — always in the DOM to prevent layout shift */}
+          <div
+            style={{
+              position: 'relative',
+              zIndex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              padding: '8px 24px',
+              marginBottom: '0.25rem',
+              borderRadius: '14px',
+              background: phase === 'transitioning'
+                ? 'rgba(167,139,250,0.07)'
+                : 'rgba(129,140,248,0.07)',
+              border: phase === 'transitioning'
+                ? '1px solid rgba(167,139,250,0.18)'
+                : '1px solid rgba(129,140,248,0.18)',
+              animation: phase === 'thinking' ? 'breathing 2s ease-in-out infinite' : 'none',
+              opacity: phase === 'thinking' || phase === 'transitioning' ? 1 : 0,
+              visibility: phase === 'thinking' || phase === 'transitioning' ? 'visible' as const : 'hidden' as const,
+              transition: 'opacity 0.3s ease, visibility 0.3s ease',
+            }}
+          >
             <div
               style={{
-                position: 'relative',
-                zIndex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                padding: '12px 24px',
-                marginBottom: '0.5rem',
-                background: 'rgba(167,139,250,0.07)',
-                border: '1px solid rgba(167,139,250,0.18)',
-                borderRadius: '14px',
-                animation: 'fadeIn 0.3s ease',
+                width: '7px',
+                height: '7px',
+                borderRadius: '50%',
+                background: phase === 'transitioning' ? '#a78bfa' : '#818cf8',
+                flexShrink: 0,
+                opacity: 0.8,
+                animation: phase === 'transitioning' ? 'pulse-ring 1.2s ease-out infinite' : 'none',
               }}
-            >
-              <div
-                style={{
-                  width: '7px',
-                  height: '7px',
-                  borderRadius: '50%',
-                  background: '#a78bfa',
-                  flexShrink: 0,
-                  animation: 'pulse-ring 1.2s ease-out infinite',
-                }}
-              />
-              <span
-                style={{
-                  fontFamily: "'Space Grotesk', sans-serif",
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#c4b5fd',
-                  letterSpacing: '0.01em',
-                }}
-              >
-                Moving to the next question&hellip;
-              </span>
-            </div>
-          )}
-
-          {/* Thinking pause overlay */}
-          {phase === 'thinking' && (
-            <div
+            />
+            <span
               style={{
-                position: 'relative',
-                zIndex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                padding: '8px 24px',
-                marginBottom: '0.25rem',
-                background: 'rgba(129,140,248,0.07)',
-                border: '1px solid rgba(129,140,248,0.18)',
-                borderRadius: '14px',
-                animation: 'breathing 2s ease-in-out infinite',
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: '13px',
+                fontWeight: '600',
+                color: phase === 'transitioning' ? '#c4b5fd' : '#a5b4fc',
+                letterSpacing: '0.01em',
               }}
             >
-              <div
-                style={{
-                  width: '7px',
-                  height: '7px',
-                  borderRadius: '50%',
-                  background: '#818cf8',
-                  flexShrink: 0,
-                  opacity: 0.8,
-                }}
-              />
-              <span
-                style={{
-                  fontFamily: "'Space Grotesk', sans-serif",
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  color: '#a5b4fc',
-                  letterSpacing: '0.01em',
-                }}
-              >
-                Take a moment to collect your thoughts&hellip;
-              </span>
-            </div>
-          )}
+              {phase === 'transitioning'
+                ? <>Moving to the next question&hellip;</>
+                : <>Take a moment to collect your thoughts&hellip;</>}
+            </span>
+          </div>
 
           {/* Mic error panel */}
           {phase === 'mic-error' && (
