@@ -91,11 +91,11 @@ export async function generateVoiceSummary(feedback: import('../types').Feedback
   const response = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
     temperature: 0.7,
-    max_tokens: 200,
+    max_tokens: 100,
     messages: [
       {
         role: 'system',
-        content: `You are Starly, a friendly interview coach giving a brief spoken debrief after a practice interview. Keep it to 2-4 sentences. Mention the overall score, one key strength, one area to improve, then encourage the user to explore the guided review and detailed breakdown below for more. Be warm but concise — this will be read aloud via TTS.`,
+        content: `You are Starly, a friendly interview coach giving a brief spoken debrief after a practice interview. Keep it to 1-2 sentences. Mention the overall score and one quick takeaway, then encourage them to check out the guided review below. Be warm but very concise — this will be read aloud via TTS.`,
       },
       {
         role: 'user',
@@ -126,20 +126,21 @@ export async function analyzePause(transcript: string): Promise<'definitely_done
     messages: [
       {
         role: 'system',
-        content: `You analyze an interview candidate's transcript after they paused. Decide what to do next.
+        content: `You analyze an interview candidate's transcript after they paused for several seconds. Decide what to do next. Be decisive — avoid "ask" unless truly necessary.
 
-Return "definitely_done" if you are ~70-80% confident the candidate has finished their answer. This includes:
+Return "definitely_done" if you are >=60% confident the candidate has finished. This includes:
 - The candidate explicitly signals they are finished (e.g. "I'm done", "that's it", "that's all", "that's my answer", "yeah that's about it", "I think that covers it")
 - The answer has a concluding statement (wrapping up with a result, lesson learned, or summary) AND covers reasonable ground (30+ words)
 - The candidate has addressed the question and their last sentence feels like a natural stopping point
 - The transcript trails off after making a complete point, even without an explicit wrap-up
+- The answer is 50+ words and the last sentence is a complete thought
 
-Return "definitely_still_talking" ONLY if you are confident the candidate is mid-thought:
+Return "definitely_still_talking" ONLY if you are very confident the candidate is mid-thought:
 - The transcript ends mid-sentence with an incomplete clause
 - The last word is a conjunction or preposition (and, but, so, because, like, with, to, for, that, which)
 - The transcript is very short (under 15 words) and clearly just getting started
 
-Return "ask" when genuinely uncertain. But prefer "definitely_done" over "ask" if the answer seems substantially complete.`,
+Return "ask" ONLY as a last resort when you genuinely cannot decide. Strongly prefer "definitely_done" over "ask" — a pause of several seconds after a reasonable answer almost always means they're done.`,
       },
       {
         role: 'user',

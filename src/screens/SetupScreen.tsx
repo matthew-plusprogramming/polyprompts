@@ -1192,7 +1192,7 @@ export default function SetupScreen() {
       if (prefetchedQuestionsRef.current?.key !== cacheKey) return; // stale
       const textsToCache = questions.map(q => q.text);
       if (questions.length > 1) textsToCache.push("Great, let's move on to the next question.");
-      textsToCache.push("It sounds like you might be wrapping up. Are you finished with your answer, or would you like to continue?");
+      textsToCache.push("Are you finished, or would you like to keep going?");
       prefetchTTS(textsToCache);
     }).catch(() => { /* will retry in handleStart */ });
   }, [role, difficulty, mode, resumeResult, jobDescription]);
@@ -1246,7 +1246,7 @@ export default function SetupScreen() {
         if (questions.length > 1) {
           textsToCache.push("Great, let's move on to the next question.");
         }
-        textsToCache.push("It sounds like you might be wrapping up. Are you finished with your answer, or would you like to continue?");
+        textsToCache.push("Are you finished, or would you like to keep going?");
         prefetchTTS(textsToCache);
       } else {
         log.warn('No questions matched filters', { role: mappedRole, difficulty, category });
