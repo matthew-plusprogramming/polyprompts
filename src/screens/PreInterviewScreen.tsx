@@ -18,7 +18,7 @@ type Phase = 'initializing' | 'listening' | 'responding';
 export default function PreInterviewScreen() {
   const { state } = useInterview();
   const navigate = useNavigate();
-  const { speak, isPlaying: ttsPlaying, stopPlayback, analyserNode: ttsAnalyserNode } = useTTS();
+  const { speak, speakChunks, isPlaying: ttsPlaying, stopPlayback, analyserNode: ttsAnalyserNode } = useTTS();
   const deepgram = useDeepgramTranscription();
 
   const [phase, setPhase] = useState<Phase>('initializing');
@@ -125,11 +125,9 @@ export default function PreInterviewScreen() {
 
       const fullText = chunks.join(' ');
 
-      // Play each chunk as a separate TTS call to prevent truncation
+      // Play chunks as separate TTS calls (pre-fetched in parallel, played sequentially)
       try {
-        for (let i = 0; i < chunks.length; i++) {
-          await speak(chunks[i], { onStart: i === 0 ? () => setSubtitle(fullText) : undefined });
-        }
+        await speakChunks(chunks, { onStart: () => setSubtitle(fullText) });
       } catch (err) {
         log.warn('TTS playback failed', { error: String(err) });
         setSubtitle(fullText);
