@@ -41,6 +41,7 @@ Generate ONE behavioral interview question. The question should:
 - Be relevant to the skills or responsibilities in the job description
 - Follow the "Tell me about a time when..." or similar behavioral format
 - Be challenging but fair
+- ONE sentence only. Keep it short and direct — under 25 words
 
 Respond with JSON only: {"question": "...", "type": "behavioral", "focus": "brief focus area"}`;
 

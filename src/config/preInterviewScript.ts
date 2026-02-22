@@ -22,7 +22,7 @@ export const defaultScript: PreInterviewScript = {
       trigger: 'Hi Starly',
       triggerAliases: ['Hey Starly', 'Hello Starly', 'Hi Starley', 'Hey Starley'],
       response:
-        "Hey! Welcome! I'm Starly, your interview coach. So excited to work with you today! Are you ready to crush this?",
+        "Hey, welcome! I'm Starly, your interview coach — so excited to work with you today. Are you ready to crush this?",
     },
     {
       trigger: "I'm ready",
