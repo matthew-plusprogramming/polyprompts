@@ -31,17 +31,48 @@ export async function generateResumeQuestion(
   jobDescription: string,
   questionNumber: number,
   previousQuestions: string[],
+  candidateName?: string,
 ): Promise<{ question: string; type: string; focus: string }> {
   const stopTimer = log.time('generateResumeQuestion');
   const res = await fetch('/api/resume-question', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ resumeText, jobDescription, questionNumber, previousQuestions }),
+    body: JSON.stringify({ resumeText, jobDescription, questionNumber, previousQuestions, ...(candidateName ? { candidateName } : {}) }),
   });
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Unknown error' }));
     throw new Error(err.error || `Resume question generation failed (${res.status})`);
+  }
+
+  const data = await res.json();
+  stopTimer();
+  return data;
+}
+
+export async function generateJobDescQuestion(
+  jobDescription: string,
+  questionNumber: number,
+  previousQuestions: string[],
+  resumeText?: string,
+  candidateName?: string,
+): Promise<{ question: string; type: string; focus: string }> {
+  const stopTimer = log.time('generateJobDescQuestion');
+  const res = await fetch('/api/jobdesc-question', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jobDescription,
+      questionNumber,
+      previousQuestions,
+      ...(resumeText ? { resumeText } : {}),
+      ...(candidateName ? { candidateName } : {}),
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(err.error || `Job description question generation failed (${res.status})`);
   }
 
   const data = await res.json();

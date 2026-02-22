@@ -114,6 +114,7 @@ export interface InterviewState {
   resumeData: ResumeData | null;
   resumeText: string | null;
   jobDescription: string | null;
+  candidateName: string | null;
   sessionHistory: Session[];
   ttsVoice: string;
   ttsSpeed: number;
@@ -131,6 +132,7 @@ export type InterviewAction =
   | { type: 'SET_RESUME_DATA'; payload: ResumeData }
   | { type: 'SET_RESUME_TEXT'; payload: string }
   | { type: 'SET_JOB_DESCRIPTION'; payload: string }
+  | { type: 'SET_CANDIDATE_NAME'; payload: string }
   | { type: 'START_RECORDING' }
   | { type: 'STOP_RECORDING'; payload: Blob }
   | { type: 'UPDATE_TRANSCRIPT'; payload: string }
