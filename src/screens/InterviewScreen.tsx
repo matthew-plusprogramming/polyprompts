@@ -1085,21 +1085,6 @@ export default function InterviewScreen() {
         </div>
 
         <div style={{ justifySelf: 'end', display: 'flex', gap: '0.6rem' }}>
-          <button
-            type="button"
-            style={{
-              padding: '0.55rem 0.95rem',
-              borderRadius: '12px',
-              border: '1px solid rgba(255, 255, 255, 0.28)',
-              background: 'linear-gradient(145deg, rgba(8, 18, 34, 0.92), rgba(9, 20, 37, 0.8))',
-              color: '#f1f1f1',
-              fontSize: '0.9rem',
-              letterSpacing: '0.06em',
-              cursor: 'pointer',
-            }}
-          >
-            Settings
-          </button>
           {phase === 'ready' ? (
             <button
               type="button"
