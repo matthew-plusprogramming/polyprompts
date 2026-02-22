@@ -100,7 +100,9 @@ export default function PreInterviewScreen() {
       setPhase('responding');
       log.info('Trigger detected', { stepIndex: currentStepIndex, trigger: step.trigger });
 
-      let responseText = step.response ?? '';
+      // Build response chunks (string[] for chunked TTS, or single string from AI)
+      let chunks: string[];
+      const rawResponse = step.response ?? '';
 
       // Try AI-generated response if directive is set
       if (step.aiDirective) {
@@ -111,21 +113,26 @@ export default function PreInterviewScreen() {
             step.aiDirective,
             transcriptContext,
           );
-          responseText = aiResponse;
+          chunks = [aiResponse];
           log.info('AI response generated', { length: aiResponse.length });
         } catch (err) {
           log.warn('AI response failed, using fallback', { error: String(err) });
-          // responseText already set to fallback
+          chunks = Array.isArray(rawResponse) ? rawResponse : [rawResponse];
         }
+      } else {
+        chunks = Array.isArray(rawResponse) ? rawResponse : [rawResponse];
       }
 
-      // Play TTS — show subtitle only once audio actually starts
+      const fullText = chunks.join(' ');
+
+      // Play each chunk as a separate TTS call to prevent truncation
       try {
-        await speak(responseText, { onStart: () => setSubtitle(responseText) });
+        for (let i = 0; i < chunks.length; i++) {
+          await speak(chunks[i], { onStart: i === 0 ? () => setSubtitle(fullText) : undefined });
+        }
       } catch (err) {
         log.warn('TTS playback failed', { error: String(err) });
-        // Show text as fallback if TTS fails
-        setSubtitle(responseText);
+        setSubtitle(fullText);
       }
 
       // Advance past any echo text
