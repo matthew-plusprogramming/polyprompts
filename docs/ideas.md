@@ -5,10 +5,14 @@
 
 
 - The voice sounds really good in the pre-interview but doesn't sound good during the interview. Can you analyze the differences and propose a improvement.
-<!-- - We need to tighten the pause detection & finished answer detection. Right now, there are 
+- We need to tighten the pause detection & finished answer detection. Right now, there are 
   occasionally times where the AI isn't sure if the user is done and it just keeps displaying like a 
   note. I want it to say the "it sounds like you might be wrapping up" text if it's not sure. 
   Explore how to further tighten the pause detection. Like perhaps slightly lowering the pause 
   duration but also making it like need to be even quieter.
 - We want to reduce the verbosity of responses. Especially around the summary guided review section.
-  But for our demo, we don't want it to like be speaking for too too long. -->
+  But for our demo, we don't want it to like be speaking for too too long.
+- There are points especially at the feedback where the AI says and the text
+says "the candidate" but this should be like the AI is speaking to the candidate
+so like providing advice directly to the candidate rather than just "being
+an analysis tool for the company" which is what it sounds like right now
