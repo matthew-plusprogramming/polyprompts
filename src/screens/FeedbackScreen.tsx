@@ -1,83 +1,35 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInterview } from "../context/InterviewContext";
-import type { ScoreLevel, ScoringResult, FaceMetrics } from "../types";
+import { factCheck } from "../services/api";
+import type { FactCheckResult, FaceMetrics } from "../types";
 import "./FeedbackScreen.css";
 import { createLogger } from "../utils/logger";
 
 const log = createLogger("Feedback");
 
 const dimensions = [
-  { key: "communication", label: "Communication" },
-  { key: "task", label: "Task" },
-  { key: "action", label: "Action" },
-  { key: "result", label: "Result" },
-  { key: "situation", label: "Situation" },
-  { key: "pacing", label: "Pacing" },
+  { key: "response_organization", label: "Organization" },
+  { key: "technical_knowledge", label: "Technical" },
+  { key: "problem_solving", label: "Problem Solving" },
+  { key: "position_application", label: "Position Fit" },
+  { key: "timing", label: "Timing" },
+  { key: "personability", label: "Personability" },
 ] as const;
 
 type DimensionKey = (typeof dimensions)[number]["key"];
-
-const levelToValue: Record<ScoreLevel, number> = {
-  "Getting Started": 1,
-  Developing: 2,
-  Solid: 3,
-  Strong: 4,
-};
-
-const maxLevelValue = 4;
-
-function getLevelValue(level?: ScoreLevel) {
-  if (!level) return 0;
-  return levelToValue[level] ?? 0;
-}
-
-function getLevelPercent(level?: ScoreLevel) {
-  if (!level) return 0;
-  return Math.round((getLevelValue(level) / maxLevelValue) * 100);
-}
-
-function getScoreRatio(score?: { level: ScoreLevel; explanation: string }) {
-  if (!score) return 0;
-  return getLevelValue(score.level) / maxLevelValue;
-}
-
-function getScorePercent(score?: { level: ScoreLevel; explanation: string }) {
-  if (!score) return 0;
-  return getLevelPercent(score.level);
-}
-
-function getOverallPercent(result: ScoringResult | null) {
-  if (!result) return 0;
-  const total = dimensions.reduce((sum, dimension) => {
-    const score = result.scores[dimension.key];
-    return sum + getScoreRatio(score);
-  }, 0);
-  return Math.round((total / dimensions.length) * 100);
-}
 
 export default function FeedbackScreen() {
   const { state, dispatch } = useInterview();
   const navigate = useNavigate();
 
-  // Use questionResults if available, otherwise fall back to single result
   const questionResults = state.questionResults;
   const hasMultipleResults = questionResults.length > 0;
+  const feedbackResponse = state.feedbackResponse;
+  const overall = feedbackResponse?.overall ?? null;
 
-  // For the radar/score display, use the last scored result (or currentResult as fallback)
-  const lastScoredResult = useMemo(() => {
-    if (hasMultipleResults) {
-      // Find the last question that has been scored
-      for (let i = questionResults.length - 1; i >= 0; i--) {
-        if (questionResults[i].scoringResult) return questionResults[i].scoringResult;
-      }
-    }
-    return state.currentResult;
-  }, [hasMultipleResults, questionResults, state.currentResult]);
-
-  const result = lastScoredResult;
-  const overallPercent = getOverallPercent(result);
-  const hasResult = Boolean(result);
+  const overallPercent = overall ? Math.round(overall.score) : 0;
+  const hasResult = Boolean(feedbackResponse);
 
   // Average face metrics across all questions that have them
   const avgFaceMetrics = useMemo((): FaceMetrics | null => {
@@ -115,14 +67,18 @@ export default function FeedbackScreen() {
   const [radarProgress, setRadarProgress] = useState(0);
   const animationRef = useRef<number | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [reviewIndex, setReviewIndex] = useState(0);
+
+  // Factcheck state per question
+  const [factcheckInputs, setFactcheckInputs] = useState<Record<number, string>>({});
+  const [factcheckResults, setFactcheckResults] = useState<Record<number, FactCheckResult>>({});
+  const [factcheckLoading, setFactcheckLoading] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
     }
 
-    if (!result) {
+    if (!feedbackResponse) {
       setRadarProgress(0);
       return;
     }
@@ -149,39 +105,22 @@ export default function FeedbackScreen() {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [result]);
+  }, [feedbackResponse]);
 
-  const reviewItems = useMemo(() => {
-    if (!result) return [];
-    return dimensions
-      .map((dimension) => {
-        const score = result.scores[dimension.key];
-        return {
-          key: dimension.key,
-          label: dimension.label,
-          level: score.level,
-          value: getScoreRatio(score),
-          explanation: score.explanation,
-        };
-      })
-      .sort((a, b) => a.value - b.value);
-  }, [result]);
+  const getDimensionValue = (key: DimensionKey): number => {
+    if (!overall) return 0;
+    return (overall[key] ?? 0) / 100;
+  };
 
-  const activeReview =
-    reviewItems.length > 0
-      ? reviewItems[reviewIndex % reviewItems.length]
-      : null;
-
-  useEffect(() => {
-    // setReviewIndex(0);
-  }, [reviewOpen, result]);
+  const getDimensionPercent = (key: DimensionKey): number => {
+    if (!overall) return 0;
+    return Math.round(overall[key] ?? 0);
+  };
 
   const radarPoints = () => {
     const center = 150;
     const radius = 110;
-    const rawRatios = dimensions.map((dimension) =>
-      getScoreRatio(result?.scores[dimension.key]),
-    );
+    const rawRatios = dimensions.map((d) => getDimensionValue(d.key));
     const hasAnyScore = rawRatios.some((value) => value > 0);
     return dimensions
       .map((_dimension, index) => {
@@ -219,6 +158,22 @@ export default function FeedbackScreen() {
     log.info("User action: next question");
     dispatch({ type: "NEXT_QUESTION" });
     navigate("/");
+  };
+
+  const handleFactcheck = async (idx: number) => {
+    const qr = questionResults[idx];
+    const correction = factcheckInputs[idx]?.trim();
+    if (!qr || !correction) return;
+
+    setFactcheckLoading((prev) => ({ ...prev, [idx]: true }));
+    try {
+      const result = await factCheck(qr.question.text, qr.transcript, correction);
+      setFactcheckResults((prev) => ({ ...prev, [idx]: result }));
+    } catch (err) {
+      log.error("Factcheck failed", { error: String(err) });
+    } finally {
+      setFactcheckLoading((prev) => ({ ...prev, [idx]: false }));
+    }
   };
 
   return (
@@ -357,23 +312,20 @@ export default function FeedbackScreen() {
                 <span>Overall</span>
                 <strong>{overallPercent}%</strong>
                 <em>
-                  {hasResult ? "Composite STAR score" : "Awaiting scoring"}
+                  {hasResult ? "Composite score" : "Awaiting scoring"}
                 </em>
               </div>
             </div>
 
             <div className="scoreboard__list">
               {dimensions.map((dimension) => {
-                const score = result?.scores[dimension.key as DimensionKey];
-                const level = score?.level;
-                const explanation = score?.explanation;
-                const percent = getScorePercent(score);
+                const percent = getDimensionPercent(dimension.key);
                 return (
                   <div key={dimension.key} className="scoreboard__row">
                     <div className="scoreboard__row-header">
                       <div>
                         <p>{dimension.label}</p>
-                        <span>{level ?? "Pending"}</span>
+                        <span>{percent > 0 ? `${percent}/100` : "Pending"}</span>
                       </div>
                       <strong>{percent}%</strong>
                     </div>
@@ -383,10 +335,6 @@ export default function FeedbackScreen() {
                         style={{ width: `${percent}%` }}
                       />
                     </div>
-                    <p className="scoreboard__note">
-                      {explanation ??
-                        "Complete an interview answer to see the STAR rationale."}
-                    </p>
                   </div>
                 );
               })}
@@ -406,65 +354,188 @@ export default function FeedbackScreen() {
 
             {reviewOpen && (
               <div className="feedback__review-body">
-                {/* Multi-question: show each Q&A */}
                 {hasMultipleResults ? (
-                  questionResults.map((qr, idx) => (
-                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                      <div className="feedback__review-block">
-                        <span>Question {idx + 1}</span>
-                        <p>{qr.question.text}</p>
-                      </div>
-                      <div className="feedback__review-block">
-                        <span>Your Response</span>
-                        <p>{qr.transcript || "Response will appear after recording."}</p>
-                      </div>
-                      {qr.scoringResult && (
+                  questionResults.map((qr, idx) => {
+                    const qFeedback = feedbackResponse?.questions[idx] ?? null;
+                    const fcResult = factcheckResults[idx];
+                    const fcLoading = factcheckLoading[idx];
+                    return (
+                      <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <div className="feedback__review-block">
+                          <span>Question {idx + 1}</span>
+                          <p>{qr.question.text}</p>
+                        </div>
+                        <div className="feedback__review-block">
+                          <span>Your Response</span>
+                          <p>{qr.transcript || "Response will appear after recording."}</p>
+                        </div>
+                        {qFeedback && (
+                          <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.6rem',
+                            padding: '0.7rem 0.9rem',
+                            borderRadius: '10px',
+                            background: 'rgba(255,255,255,0.02)',
+                            border: '1px solid rgba(255,255,255,0.06)',
+                          }}>
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                            }}>
+                              <span style={{
+                                fontSize: '0.65rem',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.14em',
+                                color: '#9d9d9d',
+                              }}>
+                                Score: {Math.round(qFeedback.score)}%
+                              </span>
+                              {qFeedback.confidence_score != null && (
+                                <span style={{
+                                  fontSize: '0.6rem',
+                                  color: '#6b6b6b',
+                                }}>
+                                  Confidence: {Math.round(qFeedback.confidence_score)}%
+                                </span>
+                              )}
+                            </div>
+                            <p style={{ margin: 0, fontSize: '0.78rem', color: '#d4d4d4' }}>
+                              {qFeedback.summary}
+                            </p>
+                            {qFeedback.best_part_quote && (
+                              <div style={{ padding: '0.5rem', borderRadius: '8px', background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)' }}>
+                                <span style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: '#34d399', display: 'block', marginBottom: '0.25rem' }}>Best Part</span>
+                                <p style={{ margin: 0, fontSize: '0.75rem', color: '#a7f3d0', fontStyle: 'italic' }}>"{qFeedback.best_part_quote}"</p>
+                                <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: '#9ca3af' }}>{qFeedback.best_part_explanation}</p>
+                              </div>
+                            )}
+                            {qFeedback.worst_part_quote && (
+                              <div style={{ padding: '0.5rem', borderRadius: '8px', background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.15)' }}>
+                                <span style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: '#f87171', display: 'block', marginBottom: '0.25rem' }}>Needs Work</span>
+                                <p style={{ margin: 0, fontSize: '0.75rem', color: '#fca5a5', fontStyle: 'italic' }}>"{qFeedback.worst_part_quote}"</p>
+                                <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: '#9ca3af' }}>{qFeedback.worst_part_explanation}</p>
+                              </div>
+                            )}
+                            {qFeedback.what_went_well && (
+                              <div>
+                                <span style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: '#34d399', display: 'block', marginBottom: '0.15rem' }}>What Went Well</span>
+                                <p style={{ margin: 0, fontSize: '0.72rem', color: '#d4d4d4' }}>{qFeedback.what_went_well}</p>
+                              </div>
+                            )}
+                            {qFeedback.needs_improvement && (
+                              <div>
+                                <span style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: '#fbbf24', display: 'block', marginBottom: '0.15rem' }}>Needs Improvement</span>
+                                <p style={{ margin: 0, fontSize: '0.72rem', color: '#d4d4d4' }}>{qFeedback.needs_improvement}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {!qFeedback && (
+                          <div style={{
+                            padding: '0.5rem 0.9rem',
+                            borderRadius: '10px',
+                            background: 'rgba(255,255,255,0.02)',
+                            border: '1px solid rgba(255,255,255,0.06)',
+                            fontSize: '0.75rem',
+                            color: '#6b6b6b',
+                            fontStyle: 'italic',
+                          }}>
+                            Scoring in progress...
+                          </div>
+                        )}
+
+                        {/* Factcheck UI */}
                         <div style={{
-                          display: 'flex',
-                          gap: '0.5rem',
-                          flexWrap: 'wrap',
-                          padding: '0.5rem 0.9rem',
+                          padding: '0.6rem 0.9rem',
                           borderRadius: '10px',
-                          background: 'rgba(255,255,255,0.02)',
-                          border: '1px solid rgba(255,255,255,0.06)',
+                          background: 'rgba(255,255,255,0.015)',
+                          border: '1px solid rgba(255,255,255,0.05)',
                         }}>
                           <span style={{
-                            fontSize: '0.65rem',
+                            fontSize: '0.6rem',
                             textTransform: 'uppercase',
-                            letterSpacing: '0.14em',
-                            color: '#9d9d9d',
-                            width: '100%',
-                            marginBottom: '0.2rem',
+                            letterSpacing: '0.12em',
+                            color: '#818cf8',
+                            display: 'block',
+                            marginBottom: '0.4rem',
                           }}>
-                            Score: {getOverallPercent(qr.scoringResult)}%
+                            Fact Check
                           </span>
-                          <p style={{ margin: 0, fontSize: '0.78rem', color: '#d4d4d4' }}>
-                            {qr.scoringResult.overallSummary}
-                          </p>
+                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            <input
+                              type="text"
+                              placeholder="Enter a correction to verify..."
+                              value={factcheckInputs[idx] ?? ''}
+                              onChange={(e) => setFactcheckInputs((prev) => ({ ...prev, [idx]: e.target.value }))}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') void handleFactcheck(idx);
+                              }}
+                              style={{
+                                flex: 1,
+                                padding: '0.45rem 0.7rem',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                background: 'rgba(0,0,0,0.3)',
+                                color: '#e2e2e2',
+                                fontSize: '0.75rem',
+                                outline: 'none',
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => void handleFactcheck(idx)}
+                              disabled={!factcheckInputs[idx]?.trim() || fcLoading}
+                              style={{
+                                padding: '0.45rem 0.8rem',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(129,140,248,0.3)',
+                                background: 'rgba(129,140,248,0.1)',
+                                color: '#a5b4fc',
+                                fontSize: '0.7rem',
+                                fontWeight: '600',
+                                cursor: factcheckInputs[idx]?.trim() && !fcLoading ? 'pointer' : 'not-allowed',
+                                opacity: factcheckInputs[idx]?.trim() && !fcLoading ? 1 : 0.5,
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {fcLoading ? 'Checking...' : 'Check'}
+                            </button>
+                          </div>
+                          {fcResult && (
+                            <div style={{
+                              marginTop: '0.5rem',
+                              padding: '0.5rem 0.7rem',
+                              borderRadius: '8px',
+                              background: fcResult.is_correct ? 'rgba(52,211,153,0.06)' : 'rgba(248,113,113,0.06)',
+                              border: `1px solid ${fcResult.is_correct ? 'rgba(52,211,153,0.2)' : 'rgba(248,113,113,0.2)'}`,
+                            }}>
+                              <div style={{
+                                fontSize: '0.72rem',
+                                fontWeight: '600',
+                                color: fcResult.is_correct ? '#34d399' : '#f87171',
+                                marginBottom: '0.2rem',
+                              }}>
+                                {fcResult.result}
+                              </div>
+                              <p style={{ margin: 0, fontSize: '0.7rem', color: '#b0b0b0' }}>
+                                {fcResult.explanation}
+                              </p>
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {!qr.scoringResult && (
-                        <div style={{
-                          padding: '0.5rem 0.9rem',
-                          borderRadius: '10px',
-                          background: 'rgba(255,255,255,0.02)',
-                          border: '1px solid rgba(255,255,255,0.06)',
-                          fontSize: '0.75rem',
-                          color: '#6b6b6b',
-                          fontStyle: 'italic',
-                        }}>
-                          Scoring in progress...
-                        </div>
-                      )}
-                      {idx < questionResults.length - 1 && (
-                        <div style={{
-                          height: '1px',
-                          background: 'rgba(255,255,255,0.08)',
-                          margin: '0.5rem 0',
-                        }} />
-                      )}
-                    </div>
-                  ))
+
+                        {idx < questionResults.length - 1 && (
+                          <div style={{
+                            height: '1px',
+                            background: 'rgba(255,255,255,0.08)',
+                            margin: '0.5rem 0',
+                          }} />
+                        )}
+                      </div>
+                    );
+                  })
                 ) : (
                   <>
                     <div className="feedback__review-block">
@@ -483,34 +554,6 @@ export default function FeedbackScreen() {
                     </div>
                   </>
                 )}
-
-                <div className="feedback__review-critique">
-                  <div>
-                    <span>Area To Improve</span>
-                    <strong>{activeReview?.label ?? "Pending"}</strong>
-                  </div>
-                  <p>
-                    {activeReview?.explanation ??
-                      "Complete an interview answer to see the STAR rationale."}
-                  </p>
-                  {reviewItems.length > 1 && (
-                    <div className="feedback__review-footer">
-                      <span>
-                        {reviewIndex + 1} of {reviewItems.length}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setReviewIndex(
-                            (index) => (index + 1) % reviewItems.length,
-                          )
-                        }
-                      >
-                        Next Panel
-                      </button>
-                    </div>
-                  )}
-                </div>
               </div>
             )}
           </div>
@@ -533,15 +576,30 @@ export default function FeedbackScreen() {
               </div>
             </div>
             <div className="feedback__card">
-              <h2>Suggestions</h2>
-              {result ? (
-                <ol className="feedback__list">
-                  {result.suggestions.map((suggestion, index) => (
-                    <li key={index}>{suggestion}</li>
-                  ))}
-                </ol>
+              <h2>Feedback</h2>
+              {overall ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
+                  {overall.what_went_well && (
+                    <div>
+                      <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.14em', color: '#34d399', display: 'block', marginBottom: '0.2rem' }}>What Went Well</span>
+                      <p style={{ margin: 0, fontSize: '0.82rem', color: '#d6d6d6' }}>{overall.what_went_well}</p>
+                    </div>
+                  )}
+                  {overall.needs_improvement && (
+                    <div>
+                      <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.14em', color: '#fbbf24', display: 'block', marginBottom: '0.2rem' }}>Needs Improvement</span>
+                      <p style={{ margin: 0, fontSize: '0.82rem', color: '#d6d6d6' }}>{overall.needs_improvement}</p>
+                    </div>
+                  )}
+                  {overall.summary && (
+                    <div>
+                      <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.14em', color: '#9e9e9e', display: 'block', marginBottom: '0.2rem' }}>Summary</span>
+                      <p style={{ margin: 0, fontSize: '0.82rem', color: '#d6d6d6' }}>{overall.summary}</p>
+                    </div>
+                  )}
+                </div>
               ) : (
-                <p>Suggestions will appear after scoring.</p>
+                <p>Feedback will appear after scoring.</p>
               )}
             </div>
 

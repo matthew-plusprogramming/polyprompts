@@ -5,7 +5,8 @@ import { useTTS } from '../hooks/useTTS';
 import { useDeepgramTranscription } from '../hooks/useDeepgramTranscription';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useFaceDetection } from '../hooks/useFaceDetection';
-import { analyzePause, scoreAnswer, prefetchTTS } from '../services/openai';
+import { analyzePause, prefetchTTS } from '../services/openai';
+import { getFeedback } from '../services/api';
 import { countFillers } from '../hooks/useFillerDetection';
 import type { QuestionResult } from '../types';
 import ParticleVisualizer from '../components/ParticleVisualizer';
@@ -78,7 +79,6 @@ export default function InterviewScreen() {
   const stateRef = useRef(state);
   stateRef.current = state;
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingScoringRef = useRef<Promise<void>[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
 
   const clearSilenceTimer = useCallback(() => {
@@ -466,12 +466,12 @@ export default function InterviewScreen() {
         return;
       }
 
-      // Save question result (scoring starts as null)
+      // Save question result (feedback is null until batch scoring at the end)
       const questionResult: QuestionResult = {
         question,
         transcript,
         audioBlob: blob ?? undefined,
-        scoringResult: null,
+        feedback: null,
         metrics: {
           fillerCount: countFillers(transcript),
           wordsPerMinute: currentState.wordsPerMinute,
@@ -482,12 +482,22 @@ export default function InterviewScreen() {
       dispatch({ type: 'SAVE_QUESTION_RESULT', payload: questionResult });
 
       if (isLastQuestion) {
-        // Final question: score synchronously, wait for all pending, then navigate
+        // Final question: batch score ALL questions at once
         dispatch({ type: 'START_SCORING' });
         try {
-          const result = await scoreAnswer(transcript, question.text, currentState.resumeData ?? undefined);
-          dispatch({ type: 'UPDATE_QUESTION_SCORING', payload: { index: currentIdx, scoringResult: result } });
-          dispatch({ type: 'SET_RESULT', payload: result });
+          // Collect all questions and answers (including the one we just saved)
+          const allResults = [...currentState.questionResults, questionResult];
+          const allQuestions = allResults.map(qr => qr.question.text);
+          const allAnswers = allResults.map(qr => qr.transcript);
+
+          const feedbackResponse = await getFeedback(allQuestions, allAnswers);
+
+          // Update each question result with its individual feedback
+          feedbackResponse.questions.forEach((qFeedback, idx) => {
+            dispatch({ type: 'UPDATE_QUESTION_FEEDBACK', payload: { index: idx, feedback: qFeedback } });
+          });
+
+          dispatch({ type: 'SET_FEEDBACK_RESPONSE', payload: feedbackResponse });
           dispatch({
             type: 'SAVE_SESSION',
             payload: {
@@ -495,7 +505,7 @@ export default function InterviewScreen() {
               questionId: question.id,
               attemptNumber: currentState.previousAttempts.length + 1,
               transcript,
-              scores: result,
+              scores: feedbackResponse,
               durationSeconds: totalDuration,
               createdAt: new Date().toISOString(),
             },
@@ -504,37 +514,10 @@ export default function InterviewScreen() {
           log.error('Scoring failed', { error: String(err) });
         }
 
-        // Wait for any pending background scoring to complete
-        await Promise.allSettled(pendingScoringRef.current);
-        pendingScoringRef.current = [];
-
         log.info('Navigating to feedback');
         navigate('/feedback');
       } else {
-        // Non-final question: fire background scoring, advance to next
-        const scoringPromise = (async () => {
-          try {
-            const result = await scoreAnswer(transcript, question.text, currentState.resumeData ?? undefined);
-            dispatch({ type: 'UPDATE_QUESTION_SCORING', payload: { index: currentIdx, scoringResult: result } });
-            dispatch({
-              type: 'SAVE_SESSION',
-              payload: {
-                id: crypto.randomUUID(),
-                questionId: question.id,
-                attemptNumber: currentState.previousAttempts.length + 1,
-                transcript,
-                scores: result,
-                durationSeconds: totalDuration,
-                createdAt: new Date().toISOString(),
-              },
-            });
-          } catch (err) {
-            log.error('Background scoring failed for Q' + (currentIdx + 1), { error: String(err) });
-          }
-        })();
-        pendingScoringRef.current.push(scoringPromise);
-
-        // Begin next question flow
+        // Non-final question: just advance to next (no per-question scoring)
         finishingRef.current = false;
         await beginNextQuestionRef.current();
         return;
@@ -1109,7 +1092,7 @@ export default function InterviewScreen() {
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
               {state.questions.map((_, i) => {
                 const result = state.questionResults[i];
-                const scored = result?.scoringResult != null;
+                const scored = result?.feedback != null;
                 return (
                   <div
                     key={i}

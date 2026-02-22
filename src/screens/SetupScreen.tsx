@@ -1134,10 +1134,6 @@ export default function SetupScreen() {
       const questions = await loadQuestions({
         role: mappedRole,
         difficulty,
-        category: category === 'random' ? undefined : category,
-        resumeData: mode === 'resume' && resumeData
-          ? { skills: resumeData.skills, experience: resumeData.experiences, projects: [], education: resumeData.education }
-          : null,
         count: 2,
       });
 
