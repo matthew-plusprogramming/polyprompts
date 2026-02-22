@@ -29,7 +29,7 @@ export default function App() {
     <BrowserRouter>
       <InterviewProvider>
         <Routes>
-          <Route path="/" element={<div className="page-enter"><HomeScreen /></div>} />
+          <Route path="/" element={<div className="page-enter"><HomeScreen/></div>} />
           <Route path="/setup" element={<div className="page-enter"><SetupScreen /></div>} />
           <Route path="/job-description" element={<div className="page-enter"><JobDescription /></div>} />
           <Route path="/pre-interview" element={
