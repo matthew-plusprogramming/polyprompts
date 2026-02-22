@@ -90,7 +90,7 @@ export function useTTS() {
     throw lastError;
   }, []);
 
-  const playBlob = useCallback((blob: Blob): Promise<void> => {
+  const playBlob = useCallback((blob: Blob, onStart?: () => void): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
       cleanupAudio();
       pendingRejectRef.current = reject;
@@ -121,7 +121,9 @@ export function useTTS() {
 
       audio.oncanplaythrough = () => {
         clearTimeout(playbackTimeout);
-        audio.play().catch((err) => {
+        audio.play().then(() => {
+          onStart?.();
+        }).catch((err) => {
           pendingRejectRef.current = null;
           reject(err);
         });
@@ -143,7 +145,8 @@ export function useTTS() {
     });
   }, [cleanupAudio, ensureAudioContext]);
 
-  const speak = useCallback(async (text: string, voice?: string, speed?: number) => {
+  const speak = useCallback(async (text: string, voiceOrOpts?: string | { voice?: string; speed?: number; onStart?: () => void }, speed?: number) => {
+    const opts = typeof voiceOrOpts === 'object' ? voiceOrOpts : { voice: voiceOrOpts, speed };
     cleanupAudio();
     window.speechSynthesis?.cancel();
 
@@ -152,12 +155,12 @@ export function useTTS() {
     try {
       log.info('Fetching audio...');
       const stopFetch = log.time('tts-fetch');
-      const blob = await fetchWithRetry(text, voice, speed);
+      const blob = await fetchWithRetry(text, opts.voice, opts.speed);
       stopFetch();
       log.info('Got blob', { size: blob.size, type: blob.type });
 
       log.info('Playing...');
-      await playBlob(blob);
+      await playBlob(blob, opts.onStart);
     } catch (error) {
       // If playback was externally interrupted (e.g. component unmount / HMR), don't fall back
       if (error instanceof Error && error.message === 'Playback interrupted') {

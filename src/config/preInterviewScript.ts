@@ -28,7 +28,7 @@ export const defaultScript: PreInterviewScript = {
       trigger: "I'm ready",
       triggerAliases: ['Yes', 'Ready', "Let's go", "Let's do it", 'Yeah', 'Yep', 'Sure'],
       aiDirective:
-        "The user says they're ready. Hype them up briefly, explain you'll ask behavioral questions using the STAR framework, and tell them to take their time.",
+        "The user says they're ready. Don't greet them again (you already said hello). Hype them up briefly, explain you'll ask behavioral questions using the STAR framework, and tell them to take their time.",
       response:
         "Love the energy! I'll ask you a couple behavioral questions — just use the STAR framework: Situation, Task, Action, Result. Take your time, there's no rush. Let's do this!",
     },
