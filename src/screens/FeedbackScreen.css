@@ -480,6 +480,44 @@
   color: #f7f7f7;
 }
 
+/* ── Body Language card ── */
+
+.feedback__card--body-language {
+  background: rgba(12, 12, 12, 0.9);
+}
+
+.body-language__bars {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.5rem;
+}
+
+.body-language__row {
+  padding: 0.4rem 0.5rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(8, 8, 8, 0.6);
+}
+
+.body-language__row-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.3rem;
+}
+
+.body-language__row-header span {
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #b2b2b2;
+}
+
+.body-language__row-header strong {
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
 @media (max-width: 900px) {
   .feedback__main {
     grid-template-columns: 1fr;

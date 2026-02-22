@@ -9,7 +9,7 @@ const vadLog = log.child('VAD');
 const volumeLog = log.child('Volume');
 
 const SILENCE_THRESHOLD = 0.07;
-const SILENCE_DURATION_MS = 4000;
+const SILENCE_DURATION_MS = 3000;
 const VOLUME_CHECK_INTERVAL_MS = 100;
 
 export interface UseAudioRecorderOptions {
