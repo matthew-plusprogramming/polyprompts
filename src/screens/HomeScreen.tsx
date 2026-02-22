@@ -22,7 +22,6 @@ export default function HomeScreen() {
       }}
     >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@500;600;700&display=swap');
         @keyframes floatGlow {
           0%, 100% { transform: translateY(0px) scale(1); opacity: 0.55; }
           50% { transform: translateY(-10px) scale(1.03); opacity: 0.78; }

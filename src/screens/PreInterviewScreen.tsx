@@ -215,11 +215,10 @@ export default function PreInterviewScreen() {
         justifyContent: 'center',
         position: 'relative',
         overflow: 'hidden',
-        fontFamily: "'DM Sans', sans-serif",
+        fontFamily: "'Josefin Sans', sans-serif",
       }}
     >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:ital,wght@0,400;0,500;1,400&family=DM+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap');
         @keyframes pulse-ring {
           0%   { transform: scale(1); opacity: 0.7; }
           100% { transform: scale(1.7); opacity: 0; }
@@ -242,7 +241,7 @@ export default function PreInterviewScreen() {
           border-radius: 10px;
           color: #4b5563;
           cursor: pointer;
-          font-family: 'DM Mono', monospace;
+          font-family: 'Josefin Sans', sans-serif;
           font-size: 12px;
           padding: 8px 20px;
           transition: all 0.18s;
@@ -334,7 +333,7 @@ export default function PreInterviewScreen() {
           <p
             key={subtitle.slice(0, 30)}
             style={{
-              fontFamily: "'DM Sans', sans-serif",
+              fontFamily: "'Josefin Sans', sans-serif",
               fontSize: '16px',
               color: '#d1d5db',
               lineHeight: 1.6,
@@ -382,7 +381,7 @@ export default function PreInterviewScreen() {
             </div>
             <span
               style={{
-                fontFamily: "'DM Mono', monospace",
+                fontFamily: "'Josefin Sans', sans-serif",
                 fontSize: '12px',
                 fontWeight: '600',
                 color: '#22d3ee',
@@ -415,7 +414,7 @@ export default function PreInterviewScreen() {
             />
             <span
               style={{
-                fontFamily: "'DM Mono', monospace",
+                fontFamily: "'Josefin Sans', sans-serif",
                 fontSize: '12px',
                 fontWeight: '600',
                 color: '#a78bfa',
@@ -429,7 +428,7 @@ export default function PreInterviewScreen() {
         {phase === 'initializing' && (
           <div
             style={{
-              fontFamily: "'DM Mono', monospace",
+              fontFamily: "'Josefin Sans', sans-serif",
               fontSize: '12px',
               color: '#4b5563',
               letterSpacing: '0.08em',
@@ -447,7 +446,7 @@ export default function PreInterviewScreen() {
             ...stagger(4),
             zIndex: 1,
             marginBottom: '20px',
-            fontFamily: "'DM Mono', monospace",
+            fontFamily: "'Josefin Sans', sans-serif",
             fontSize: '11px',
             color: '#2d2d40',
           }}

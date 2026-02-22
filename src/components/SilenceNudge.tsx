@@ -73,7 +73,7 @@ export default function SilenceNudge({ visible, message }: Props) {
               fontSize: '13px',
               fontWeight: '500',
               color: '#c4b5fd',
-              fontFamily: "'Syne', sans-serif",
+              fontFamily: "'Josefin Sans', sans-serif",
               letterSpacing: '0.01em',
               lineHeight: 1.4,
             }}

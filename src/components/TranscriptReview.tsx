@@ -147,7 +147,7 @@ function TranscriptReview({
       >
         <h3
           style={{
-            fontFamily: "'Syne', sans-serif",
+            fontFamily: "'Josefin Sans', sans-serif",
             fontSize: '13px',
             fontWeight: 700,
             letterSpacing: '0.07em',
@@ -162,7 +162,7 @@ function TranscriptReview({
           <button
             onClick={handlePlay}
             style={{
-              fontFamily: "'Inter', sans-serif",
+              fontFamily: "'Josefin Sans', sans-serif",
               fontSize: '12px',
               fontWeight: 500,
               color: isPlaying ? '#f1f5f9' : '#818cf8',
@@ -186,7 +186,7 @@ function TranscriptReview({
       {/* Question context */}
       <p
         style={{
-          fontFamily: "'Inter', sans-serif",
+          fontFamily: "'Josefin Sans', sans-serif",
           fontSize: '12px',
           color: 'rgba(148,163,184,0.5)',
           margin: '0 0 14px',
@@ -220,7 +220,7 @@ function TranscriptReview({
         {transcript.trim() === '' ? (
           <p
             style={{
-              fontFamily: "'Inter', sans-serif",
+              fontFamily: "'Josefin Sans', sans-serif",
               fontSize: '14px',
               color: 'rgba(148,163,184,0.35)',
               margin: 0,
@@ -232,7 +232,7 @@ function TranscriptReview({
         ) : (
           <p
             style={{
-              fontFamily: "'Inter', sans-serif",
+              fontFamily: "'Josefin Sans', sans-serif",
               fontSize: '14px',
               color: 'rgba(226,232,240,0.82)',
               margin: 0,
@@ -261,7 +261,7 @@ function TranscriptReview({
       >
         <span
           style={{
-            fontFamily: "'Inter', sans-serif",
+            fontFamily: "'Josefin Sans', sans-serif",
             fontSize: '11px',
             color: 'rgba(148,163,184,0.4)',
             letterSpacing: '0.04em',
@@ -283,7 +283,7 @@ function TranscriptReview({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '5px',
-                fontFamily: "'Inter', sans-serif",
+                fontFamily: "'Josefin Sans', sans-serif",
                 fontSize: '11px',
                 color: 'rgba(148,163,184,0.55)',
               }}
@@ -306,7 +306,7 @@ function TranscriptReview({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '5px',
-                fontFamily: "'Inter', sans-serif",
+                fontFamily: "'Josefin Sans', sans-serif",
                 fontSize: '11px',
                 color: 'rgba(148,163,184,0.55)',
               }}

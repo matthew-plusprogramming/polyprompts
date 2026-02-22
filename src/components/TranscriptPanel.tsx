@@ -65,7 +65,7 @@ export default function TranscriptPanel({ transcript, interimText, isRecording }
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
               color: isRecording ? '#f87171' : '#4b5563',
-              fontFamily: "'Syne', sans-serif",
+              fontFamily: "'Josefin Sans', sans-serif",
               transition: 'color 0.3s',
             }}
           >
