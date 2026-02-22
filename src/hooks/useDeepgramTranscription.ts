@@ -38,25 +38,10 @@ export function useDeepgramTranscription() {
     setFinalTranscript('');
     setInterimTranscript('');
 
-    // 1. Get Deepgram API key — use serverless endpoint in production,
-    //    fall back to VITE_DEEPGRAM_API_KEY env var in local dev
-    let dgKey: string | undefined;
-    const stopKeyExchange = log.time('keyExchange');
-    try {
-      const res = await fetch('/api/key', { method: 'POST' });
-      if (res.ok) {
-        const data = await res.json();
-        dgKey = data.key;
-      }
-    } catch {
-      // /api/key not available (local dev) — fall through
-    }
-    stopKeyExchange();
+    // 1. Get Deepgram API key from env
+    const dgKey = import.meta.env.VITE_DEEPGRAM_API_KEY;
     if (!dgKey) {
-      dgKey = import.meta.env.VITE_DEEPGRAM_API_KEY;
-    }
-    if (!dgKey) {
-      log.error('No API key available. Set VITE_DEEPGRAM_API_KEY in .env for local dev.');
+      log.error('No API key available. Set VITE_DEEPGRAM_API_KEY in .env');
       return;
     }
 
