@@ -163,6 +163,8 @@ export default function FeedbackScreen() {
 
   const runGuidedReview = useCallback(async () => {
     const { ttsVoice, ttsSpeed } = state;
+    // 20% faster TTS for guided review narration
+    const guidedSpeed = Math.min(4.0, ttsSpeed * 1.2);
     const questions = feedbackResponse?.questions ?? [];
     const overallData = feedbackResponse?.overall;
 
@@ -171,7 +173,11 @@ export default function FeedbackScreen() {
     guidedCancelledRef.current = false;
     setReviewOpen(true);
 
-    // Prefetch all TTS texts
+    // Wait for React to render the review body + video elements
+    await new Promise(resolve => setTimeout(resolve, 300));
+    if (guidedCancelledRef.current) return;
+
+    // Prefetch all TTS texts at guided speed
     const introText = `Let's review your interview. You scored ${Math.round(overallData.score)}% overall. Let me walk you through each question.`;
     const outroText = overallData.summary || 'That completes your interview review. Keep practicing!';
     const allTexts = [introText];
@@ -180,12 +186,12 @@ export default function FeedbackScreen() {
       if (q.worst_part_explanation) allTexts.push(q.worst_part_explanation);
     }
     allTexts.push(outroText);
-    prefetchTTS(allTexts, ttsVoice, ttsSpeed);
+    prefetchTTS(allTexts, ttsVoice, guidedSpeed);
 
     // Intro
     setGuidedPhase('intro');
     setGuidedQuestionIdx(-1);
-    try { await speak(introText, ttsVoice, ttsSpeed); } catch { /* interrupted */ }
+    try { await speak(introText, ttsVoice, guidedSpeed); } catch { /* interrupted */ }
     if (guidedCancelledRef.current) return;
 
     // Per-question loop
@@ -207,7 +213,7 @@ export default function FeedbackScreen() {
         if (guidedCancelledRef.current) return;
 
         setGuidedPhase('narrate-best');
-        try { await speak(qFeedback.best_part_explanation, ttsVoice, ttsSpeed); } catch { /* interrupted */ }
+        try { await speak(qFeedback.best_part_explanation, ttsVoice, guidedSpeed); } catch { /* interrupted */ }
         if (guidedCancelledRef.current) return;
       }
 
@@ -218,7 +224,7 @@ export default function FeedbackScreen() {
         if (guidedCancelledRef.current) return;
 
         setGuidedPhase('narrate-worst');
-        try { await speak(qFeedback.worst_part_explanation, ttsVoice, ttsSpeed); } catch { /* interrupted */ }
+        try { await speak(qFeedback.worst_part_explanation, ttsVoice, guidedSpeed); } catch { /* interrupted */ }
         if (guidedCancelledRef.current) return;
       }
     }
@@ -227,7 +233,7 @@ export default function FeedbackScreen() {
     if (guidedCancelledRef.current) return;
     setGuidedPhase('outro');
     setGuidedQuestionIdx(-1);
-    try { await speak(outroText, ttsVoice, ttsSpeed); } catch { /* interrupted */ }
+    try { await speak(outroText, ttsVoice, guidedSpeed); } catch { /* interrupted */ }
 
     setGuidedPhase('idle');
     setGuidedQuestionIdx(0);
