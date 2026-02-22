@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { FormEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInterview } from "../context/InterviewContext";
 import type { ScoreLevel, ScoringResult } from "../types";
 import "./FeedbackScreen.css";
 import { createLogger } from "../utils/logger";
+import { sendGroqChat } from "../services/groq";
+import type { GroqCategoryFeedback, GroqChatMessage } from "../services/groq";
 
 const log = createLogger("Feedback");
 
@@ -17,6 +20,20 @@ const dimensions = [
 ] as const;
 
 type DimensionKey = (typeof dimensions)[number]["key"];
+type DimensionOverride = {
+  percent: number;
+  level: ScoreLevel;
+  explanation: string;
+};
+
+const TEST_SCORE_OVERRIDES: Partial<Record<DimensionKey, DimensionOverride>> = {
+  // TEST DATA: force Communication to 25% with a fixed summary note.
+  communication: {
+    percent: 25,
+    level: "Getting Started",
+    explanation: "stuttering with filler words",
+  },
+};
 
 const levelToValue: Record<ScoreLevel, number> = {
   "Getting Started": 1,
@@ -47,11 +64,52 @@ function getScorePercent(score?: { level: ScoreLevel; explanation: string }) {
   return getLevelPercent(score.level);
 }
 
+function clampPercent(value: number) {
+  return Math.max(0, Math.min(100, value));
+}
+
+function getDimensionOverride(dimensionKey: DimensionKey) {
+  return TEST_SCORE_OVERRIDES[dimensionKey];
+}
+
+function getDimensionRatio(
+  dimensionKey: DimensionKey,
+  score?: { level: ScoreLevel; explanation: string },
+) {
+  const override = getDimensionOverride(dimensionKey);
+  if (override) return clampPercent(override.percent) / 100;
+  return getScoreRatio(score);
+}
+
+function getDimensionPercent(
+  dimensionKey: DimensionKey,
+  score?: { level: ScoreLevel; explanation: string },
+) {
+  const override = getDimensionOverride(dimensionKey);
+  if (override) return clampPercent(override.percent);
+  return getScorePercent(score);
+}
+
+function getDimensionLevel(
+  dimensionKey: DimensionKey,
+  score?: { level: ScoreLevel; explanation: string },
+) {
+  const override = getDimensionOverride(dimensionKey);
+  return override?.level ?? score?.level;
+}
+
+function getDimensionExplanation(
+  dimensionKey: DimensionKey,
+  score?: { level: ScoreLevel; explanation: string },
+) {
+  const override = getDimensionOverride(dimensionKey);
+  return override?.explanation ?? score?.explanation;
+}
+
 function getOverallPercent(result: ScoringResult | null) {
-  if (!result) return 0;
   const total = dimensions.reduce((sum, dimension) => {
-    const score = result.scores[dimension.key];
-    return sum + getScoreRatio(score);
+    const score = result?.scores[dimension.key];
+    return sum + getDimensionRatio(dimension.key, score);
   }, 0);
   return Math.round((total / dimensions.length) * 100);
 }
@@ -60,14 +118,15 @@ export default function FeedbackScreen() {
   const { state, dispatch } = useInterview();
   const navigate = useNavigate();
   const result = state.currentResult;
+  const hasTestData = Object.values(TEST_SCORE_OVERRIDES).some(Boolean);
   const overallPercent = getOverallPercent(result);
-  const hasResult = Boolean(result);
+  const hasScoreData = Boolean(result) || hasTestData;
 
   useEffect(() => {
     log.info("Mounted", {
       overallPercent,
       questionId: state.currentQuestion?.id,
-      hasResult,
+      hasScoreData,
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -75,13 +134,19 @@ export default function FeedbackScreen() {
   const animationRef = useRef<number | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewIndex, setReviewIndex] = useState(0);
+  const [chatInput, setChatInput] = useState("");
+  const [chatMessages, setChatMessages] = useState<GroqChatMessage[]>([]);
+  const [chatError, setChatError] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatFormRef = useRef<HTMLFormElement | null>(null);
+  const chatThreadRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
     }
 
-    if (!result) {
+    if (!hasScoreData) {
       setRadarProgress(0);
       return;
     }
@@ -108,38 +173,71 @@ export default function FeedbackScreen() {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [result]);
+  }, [hasScoreData]);
 
   const reviewItems = useMemo(() => {
-    if (!result) return [];
+    if (!result && !hasTestData) return [];
     return dimensions
       .map((dimension) => {
-        const score = result.scores[dimension.key];
+        const score = result?.scores[dimension.key];
         return {
           key: dimension.key,
           label: dimension.label,
-          level: score.level,
-          value: getScoreRatio(score),
-          explanation: score.explanation,
+          level: getDimensionLevel(dimension.key, score),
+          value: getDimensionRatio(dimension.key, score),
+          explanation: getDimensionExplanation(dimension.key, score),
         };
       })
       .sort((a, b) => a.value - b.value);
-  }, [result]);
+  }, [hasTestData, result]);
 
   const activeReview =
     reviewItems.length > 0
       ? reviewItems[reviewIndex % reviewItems.length]
       : null;
+  const chatScoreSummary = useMemo(() => {
+    if (!result && !hasTestData) return [];
+    return dimensions
+      .map((dimension) => {
+        const score = result?.scores[dimension.key];
+        const percent = getDimensionPercent(dimension.key, score);
+        const level = getDimensionLevel(dimension.key, score) ?? "Pending";
+        if (percent === 0 && level === "Pending") return null;
+        return `${dimension.label}: ${percent}% (${level})`;
+      })
+      .filter((item): item is string => Boolean(item));
+  }, [hasTestData, result]);
+  const chatCategoryFeedback = useMemo<GroqCategoryFeedback[]>(() => {
+    if (!result && !hasTestData) return [];
+    return dimensions.map((dimension) => {
+      const score = result?.scores[dimension.key];
+      const percent = getDimensionPercent(dimension.key, score);
+      const level = getDimensionLevel(dimension.key, score) ?? "Pending";
+      const explanation = getDimensionExplanation(dimension.key, score) ?? "";
+      return {
+        key: dimension.key,
+        label: dimension.label,
+        percent,
+        level,
+        explanation,
+      };
+    });
+  }, [hasTestData, result]);
 
   useEffect(() => {
     // setReviewIndex(0);
   }, [reviewOpen, result]);
 
+  useEffect(() => {
+    if (!chatThreadRef.current) return;
+    chatThreadRef.current.scrollTop = chatThreadRef.current.scrollHeight;
+  }, [chatMessages, chatLoading]);
+
   const radarPoints = () => {
     const center = 150;
     const radius = 110;
     const rawRatios = dimensions.map((dimension) =>
-      getScoreRatio(result?.scores[dimension.key]),
+      getDimensionRatio(dimension.key, result?.scores[dimension.key]),
     );
     const hasAnyScore = rawRatios.some((value) => value > 0);
     return dimensions
@@ -178,6 +276,61 @@ export default function FeedbackScreen() {
     log.info("User action: next question");
     dispatch({ type: "NEXT_QUESTION" });
     navigate("/");
+  };
+
+  const handlePromptSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = chatInput.trim();
+    if (!trimmed || chatLoading) return;
+
+    const userMessage: GroqChatMessage = { role: "user", content: trimmed };
+    const nextMessages = [...chatMessages, userMessage];
+    setChatMessages(nextMessages);
+    setChatError("");
+    setChatInput("");
+    const stuckTimer = window.setTimeout(() => {
+      setChatLoading(false);
+      setChatError(
+        "Request timed out. Open app on http://localhost:3000 with `npm run dev:vercel`, then retry.",
+      );
+    }, 25000);
+
+    try {
+      setChatLoading(true);
+      const response = await sendGroqChat({
+        messages: nextMessages,
+        question: state.currentQuestion?.text,
+        transcript: state.liveTranscript,
+        suggestions: result?.suggestions ? [...result.suggestions] : [],
+        followUp: result?.followUp,
+        scoreSummary: chatScoreSummary,
+        overallSummary: result?.overallSummary,
+        categoryFeedback: chatCategoryFeedback,
+        role: state.role,
+        difficulty: state.difficulty,
+      });
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: response.reply },
+      ]);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to contact assistant.";
+      setChatError(message);
+    } finally {
+      window.clearTimeout(stuckTimer);
+      setChatLoading(false);
+    }
+  };
+
+  const handleChatInputKeyDown = (
+    event: ReactKeyboardEvent<HTMLTextAreaElement>,
+  ) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      if (!chatInput.trim() || chatLoading) return;
+      chatFormRef.current?.requestSubmit();
+    }
   };
 
   return (
@@ -273,7 +426,7 @@ export default function FeedbackScreen() {
                   strokeWidth="1.2"
                   filter="url(#softGlow)"
                   className="scoreboard__shape"
-                  opacity={hasResult ? 0.9 : 0.15}
+                  opacity={hasScoreData ? 0.9 : 0.15}
                 />
 
                 {dimensions.map((dimension, index) => {
@@ -312,7 +465,7 @@ export default function FeedbackScreen() {
                 <span>Overall</span>
                 <strong>{overallPercent}%</strong>
                 <em>
-                  {hasResult ? "Composite STAR score" : "Awaiting scoring"}
+                  {hasScoreData ? "Composite STAR score" : "Awaiting scoring"}
                 </em>
               </div>
             </div>
@@ -320,9 +473,9 @@ export default function FeedbackScreen() {
             <div className="scoreboard__list">
               {dimensions.map((dimension) => {
                 const score = result?.scores[dimension.key as DimensionKey];
-                const level = score?.level;
-                const explanation = score?.explanation;
-                const percent = getScorePercent(score);
+                const level = getDimensionLevel(dimension.key, score);
+                const explanation = getDimensionExplanation(dimension.key, score);
+                const percent = getDimensionPercent(dimension.key, score);
                 return (
                   <div key={dimension.key} className="scoreboard__row">
                     <div className="scoreboard__row-header">
@@ -403,6 +556,51 @@ export default function FeedbackScreen() {
                     </div>
                   )}
                 </div>
+
+                <form
+                  ref={chatFormRef}
+                  className="feedback__chat-form"
+                  onSubmit={handlePromptSubmit}
+                >
+                  <textarea
+                    value={chatInput}
+                    onChange={(event) => setChatInput(event.target.value)}
+                    onKeyDown={handleChatInputKeyDown}
+                    placeholder="Ask a follow-up question... (Enter to send, Shift+Enter for new line)"
+                    aria-label="Chat input"
+                    rows={3}
+                  />
+                  <button type="submit" disabled={!chatInput.trim() || chatLoading}>
+                    {chatLoading ? (
+                      "..."
+                    ) : (
+                      <svg
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                        focusable="false"
+                      >
+                        <path d="M5 12h13M13 6l6 6-6 6" />
+                      </svg>
+                    )}
+                  </button>
+                </form>
+                <div className="feedback__chat-thread" ref={chatThreadRef}>
+                  {chatMessages.length === 0 && !chatLoading && (
+                    <p className="feedback__chat-empty">
+                      Ask Starly a follow-up question about your answer.
+                    </p>
+                  )}
+                  {chatMessages.map((message, index) => (
+                    <div
+                      key={`${message.role}-${index}`}
+                      className={`feedback__chat-message feedback__chat-message--${message.role}`}
+                    >
+                      <span>{message.role === "assistant" ? "Starly" : "You"}</span>
+                      <p>{message.content}</p>
+                    </div>
+                  ))}
+                </div>
+                {chatError && <p className="feedback__chat-preview">{chatError}</p>}
               </div>
             )}
           </div>
