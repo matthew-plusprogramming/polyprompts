@@ -74,11 +74,11 @@ export function useTTS() {
     });
   }, []);
 
-  const fetchWithRetry = useCallback(async (text: string, voice?: string, speed?: number): Promise<Blob> => {
+  const fetchWithRetry = useCallback(async (text: string, voice?: string, speed?: number, instructions?: string): Promise<Blob> => {
     let lastError: Error | null = null;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
-        return await textToSpeech(text, voice, speed);
+        return await textToSpeech(text, voice, speed, instructions);
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
         log.warn(`Fetch attempt ${attempt + 1} failed`, { error: lastError.message });
@@ -145,7 +145,7 @@ export function useTTS() {
     });
   }, [cleanupAudio, ensureAudioContext]);
 
-  const speak = useCallback(async (text: string, voiceOrOpts?: string | { voice?: string; speed?: number; onStart?: () => void }, speed?: number) => {
+  const speak = useCallback(async (text: string, voiceOrOpts?: string | { voice?: string; speed?: number; instructions?: string; onStart?: () => void }, speed?: number) => {
     const opts = typeof voiceOrOpts === 'object' ? voiceOrOpts : { voice: voiceOrOpts, speed };
     cleanupAudio();
     window.speechSynthesis?.cancel();
@@ -155,7 +155,7 @@ export function useTTS() {
     try {
       log.info('Fetching audio...');
       const stopFetch = log.time('tts-fetch');
-      const blob = await fetchWithRetry(text, opts.voice, opts.speed);
+      const blob = await fetchWithRetry(text, opts.voice, opts.speed, opts.instructions);
       stopFetch();
       log.info('Got blob', { size: blob.size, type: blob.type });
 

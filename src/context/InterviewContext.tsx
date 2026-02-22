@@ -30,7 +30,7 @@ const initialState: InterviewState = {
   jobDescription: null,
   sessionHistory: [],
   ttsVoice: 'marin',
-  ttsSpeed: 1.05,
+  ttsSpeed: 1.0,
   voiceSummary: null,
 };
 
