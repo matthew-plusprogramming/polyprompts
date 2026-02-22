@@ -1352,94 +1352,63 @@ export default function InterviewScreen() {
               text={state.currentQuestion?.text ?? ''}
               isTyping={phase === 'speaking-question'}
               isComplete={phase !== 'speaking-question' && phase !== 'ready'}
-              visible={phase === 'speaking-question' || phase === 'thinking' || phase === 'recording' || phase === 'silence-detected' || phase === 'asking-done'}
+              visible={phase === 'ready' || phase === 'speaking-question' || phase === 'thinking' || phase === 'recording' || phase === 'silence-detected' || phase === 'asking-done'}
               ttsSpeed={state.ttsSpeed}
             />
           </div>
 
-          {/* Transitioning overlay */}
-          {phase === 'transitioning' && (
-            <div
-              style={{
-                position: 'relative',
-                zIndex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                padding: '12px 24px',
-                marginBottom: '0.5rem',
-                background: 'rgba(167,139,250,0.07)',
-                border: '1px solid rgba(167,139,250,0.18)',
-                borderRadius: '14px',
-                animation: 'fadeIn 0.3s ease',
-              }}
-            >
+          {/* Status banner — container always visible for stable layout, content fades */}
+          {(() => {
+            const active = phase === 'thinking' || phase === 'transitioning';
+            return (
               <div
                 style={{
-                  width: '7px',
-                  height: '7px',
-                  borderRadius: '50%',
-                  background: '#a78bfa',
-                  flexShrink: 0,
-                  animation: 'pulse-ring 1.2s ease-out infinite',
-                }}
-              />
-              <span
-                style={{
-                  fontFamily: "'Space Grotesk', sans-serif",
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#c4b5fd',
-                  letterSpacing: '0.01em',
-                }}
-              >
-                Moving to the next question&hellip;
-              </span>
-            </div>
-          )}
-
-          {/* Thinking pause overlay */}
-          {phase === 'thinking' && (
-            <div
-              style={{
-                position: 'relative',
-                zIndex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                padding: '8px 24px',
-                marginBottom: '0.25rem',
-                background: 'rgba(129,140,248,0.07)',
-                border: '1px solid rgba(129,140,248,0.18)',
-                borderRadius: '14px',
-                animation: 'breathing 2s ease-in-out infinite',
-              }}
-            >
-              <div
-                style={{
-                  width: '7px',
-                  height: '7px',
-                  borderRadius: '50%',
-                  background: '#818cf8',
-                  flexShrink: 0,
-                  opacity: 0.8,
-                }}
-              />
-              <span
-                style={{
-                  fontFamily: "'Space Grotesk', sans-serif",
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  color: '#a5b4fc',
-                  letterSpacing: '0.01em',
+                  position: 'relative',
+                  zIndex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  padding: active ? '8px 24px' : '0 24px',
+                  maxHeight: active ? '40px' : '0px',
+                  overflow: 'hidden',
+                  borderRadius: '14px',
+                  background: 'rgba(99,102,241,0.06)',
+                  border: active ? '1px solid rgba(99,102,241,0.16)' : '1px solid transparent',
+                  animation: phase === 'thinking' ? 'breathing 2s ease-in-out infinite' : 'none',
+                  transition: 'max-height 0.3s ease, padding 0.3s ease, border-color 0.3s ease',
                 }}
               >
-                Take a moment to collect your thoughts&hellip;
-              </span>
-            </div>
-          )}
+                <div
+                  style={{
+                    width: '7px',
+                    height: '7px',
+                    borderRadius: '50%',
+                    background: phase === 'transitioning' ? '#a78bfa' : '#818cf8',
+                    flexShrink: 0,
+                    opacity: active ? 0.8 : 0,
+                    transition: 'opacity 0.3s ease',
+                    animation: phase === 'transitioning' ? 'pulse-ring 1.2s ease-out infinite' : 'none',
+                  }}
+                />
+                <span
+                  style={{
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: phase === 'transitioning' ? '#c4b5fd' : '#a5b4fc',
+                    letterSpacing: '0.01em',
+                    opacity: active ? 1 : 0,
+                    transition: 'opacity 0.3s ease',
+                  }}
+                >
+                  {phase === 'transitioning'
+                    ? <>Moving to the next question&hellip;</>
+                    : <>Take a moment to collect your thoughts&hellip;</>}
+                </span>
+              </div>
+            );
+          })()}
 
           {/* Mic error panel */}
           {phase === 'mic-error' && (
@@ -1547,12 +1516,6 @@ export default function InterviewScreen() {
                 Live Transcript
               </strong>
 
-              {/* Question preview in ready state (full question shows via typewriter during interview) */}
-              {state.currentQuestion && phase === 'ready' && (
-                <span style={{ fontSize: '0.75rem', color: '#94a3b8', maxWidth: '60%', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {state.currentQuestion.text}
-                </span>
-              )}
             </div>
 
             <div

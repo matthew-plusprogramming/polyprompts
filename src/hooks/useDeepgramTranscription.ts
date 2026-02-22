@@ -39,7 +39,7 @@ export function useDeepgramTranscription() {
     setInterimTranscript('');
 
     // 1. Get Deepgram API key from env
-    const dgKey = import.meta.env.VITE_DEEPGRAM_API_KEY;
+    const dgKey = (import.meta.env.VITE_DEEPGRAM_API_KEY ?? '').trim();
     if (!dgKey) {
       log.error('No API key available. Set VITE_DEEPGRAM_API_KEY in .env');
       return;
