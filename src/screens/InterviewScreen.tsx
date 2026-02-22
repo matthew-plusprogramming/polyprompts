@@ -9,6 +9,7 @@ import { analyzePause, scoreAnswer, prefetchTTS } from '../services/openai';
 import { countFillers } from '../hooks/useFillerDetection';
 import type { QuestionResult } from '../types';
 import ParticleVisualizer from '../components/ParticleVisualizer';
+import TypewriterQuestion from '../components/TypewriterQuestion';
 import SilenceNudge from '../components/SilenceNudge';
 import cameraOnIcon from '../Icons/CameraOn.png';
 import cameraOffIcon from '../Icons/cameraOff.png';
@@ -1362,47 +1363,16 @@ export default function InterviewScreen() {
 
           {/* ── Phase-specific overlays (matthew's logic) ── */}
 
-          {/* Speaking-question overlay */}
-          {phase === 'speaking-question' && (
-            <div
-              style={{
-                position: 'relative',
-                zIndex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                padding: '12px 24px',
-                marginBottom: '0.5rem',
-                background: 'rgba(167,139,250,0.07)',
-                border: '1px solid rgba(167,139,250,0.18)',
-                borderRadius: '14px',
-                animation: 'fadeIn 0.3s ease',
-              }}
-            >
-              <div
-                style={{
-                  width: '7px',
-                  height: '7px',
-                  borderRadius: '50%',
-                  background: '#a78bfa',
-                  flexShrink: 0,
-                  animation: 'pulse-ring 1.2s ease-out infinite',
-                }}
-              />
-              <span
-                style={{
-                  fontFamily: "'Space Grotesk', sans-serif",
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#c4b5fd',
-                  letterSpacing: '0.01em',
-                }}
-              >
-                Interviewer is asking your question aloud&hellip;
-              </span>
-            </div>
-          )}
+          {/* Typewriter question display — container always present, content fades in/out */}
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <TypewriterQuestion
+              text={state.currentQuestion?.text ?? ''}
+              isTyping={phase === 'speaking-question'}
+              isComplete={phase !== 'speaking-question' && phase !== 'ready'}
+              visible={phase === 'speaking-question' || phase === 'thinking' || phase === 'recording' || phase === 'silence-detected' || phase === 'asking-done'}
+              ttsSpeed={state.ttsSpeed}
+            />
+          </div>
 
           {/* Transitioning overlay */}
           {phase === 'transitioning' && (
@@ -1456,8 +1426,8 @@ export default function InterviewScreen() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '10px',
-                padding: '12px 24px',
-                marginBottom: '0.5rem',
+                padding: '8px 24px',
+                marginBottom: '0.25rem',
                 background: 'rgba(129,140,248,0.07)',
                 border: '1px solid rgba(129,140,248,0.18)',
                 borderRadius: '14px',
@@ -1477,7 +1447,7 @@ export default function InterviewScreen() {
               <span
                 style={{
                   fontFamily: "'Space Grotesk', sans-serif",
-                  fontSize: '14px',
+                  fontSize: '13px',
                   fontWeight: '600',
                   color: '#a5b4fc',
                   letterSpacing: '0.01em',
@@ -1594,7 +1564,7 @@ export default function InterviewScreen() {
                 Live Transcript
               </strong>
 
-              {/* Question display (compact) */}
+              {/* Question preview in ready state (full question shows via typewriter during interview) */}
               {state.currentQuestion && phase === 'ready' && (
                 <span style={{ fontSize: '0.75rem', color: '#94a3b8', maxWidth: '60%', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {state.currentQuestion.text}
