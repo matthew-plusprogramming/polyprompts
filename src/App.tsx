@@ -4,6 +4,7 @@ import { InterviewProvider } from './context/InterviewContext';
 import HomeScreen from './screens/HomeScreen';
 import JobDescription from './screens/JobDescription';
 
+const InfoPage = lazy(() => import('./screens/InfoPage'));
 const PreInterviewScreen = lazy(() => import('./screens/PreInterviewScreen'));
 const InterviewScreen = lazy(() => import('./screens/InterviewScreen'));
 const FeedbackScreen = lazy(() => import('./screens/FeedbackScreen'));
@@ -29,6 +30,11 @@ export default function App() {
       <InterviewProvider>
         <Routes>
           <Route path="/" element={<div className="page-enter"><HomeScreen /></div>} />
+          <Route path="/info" element={
+            <Suspense fallback={loadingFallback}>
+              <div className="page-enter"><InfoPage /></div>
+            </Suspense>
+          } />
           <Route path="/job-description" element={<div className="page-enter"><JobDescription /></div>} />
           <Route path="/pre-interview" element={
             <Suspense fallback={loadingFallback}>
