@@ -46,13 +46,11 @@ Generate exactly ONE interview question for a ${role || "software engineering in
 
 STRICT RULES:
 - Output ONLY the question itself
-- Do NOT include explanations
-- Do NOT include introductions, unless it's conversational phrases an interviewer would use
-- Do NOT include conclusions
+- Do NOT include explanations, conclusions, or preamble
 - Do NOT include phrases like "Sure!" or "Here is a question"
 - Do NOT include numbering
-- Maximum 2 sentences
-- Be concise and realistic
+- ONE sentence only. Keep it short and direct — under 25 words
+- A brief conversational lead-in like "Tell me about a time when..." is fine
 
 Previously asked questions:
 ${previousQuestions?.join("\n") || "None"}
