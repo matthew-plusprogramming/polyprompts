@@ -55,6 +55,7 @@ export interface OverallFeedback {
   what_went_well: string;
   needs_improvement: string;
   summary: string;
+  confidence_score?: number;
 }
 
 export interface FeedbackResponse {

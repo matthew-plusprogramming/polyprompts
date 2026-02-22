@@ -73,11 +73,12 @@ function buildSchema(questionCount) {
             what_went_well: { type: "string" },
             needs_improvement: { type: "string" },
             summary: { type: "string" },
+            confidence_score: { type: "number" },
           },
           required: [
             "response_organization", "technical_knowledge", "problem_solving",
             "position_application", "timing", "personability",
-            "what_went_well", "needs_improvement", "summary",
+            "what_went_well", "needs_improvement", "summary", "confidence_score",
           ],
           additionalProperties: false,
         },
@@ -137,6 +138,7 @@ For EACH of the ${questions.length} questions in the transcript, do ALL of the f
 FOR THE OVERALL INTERVIEW:
 - Repeat the same six categories, overall.score = average
 - Provide overall what_went_well, needs_improvement, summary
+- Provide an overall "confidence_score" (0.0–100.0) reflecting how confident you are in your overall assessment
 
 You MUST return exactly ${questions.length} items in the "questions" array.
 ${resumeContext}
