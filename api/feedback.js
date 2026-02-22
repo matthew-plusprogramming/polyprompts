@@ -19,6 +19,75 @@ const CATEGORIES = [
   "personability",
 ];
 
+function buildSchema(questionCount) {
+  const questionSchema = {
+    type: "object",
+    properties: {
+      response_organization: { type: "number" },
+      technical_knowledge: { type: "number" },
+      problem_solving: { type: "number" },
+      position_application: { type: "number" },
+      timing: { type: "number" },
+      personability: { type: "number" },
+      best_part_quote: { type: "string" },
+      best_part_explanation: { type: "string" },
+      worst_part_quote: { type: "string" },
+      worst_part_explanation: { type: "string" },
+      what_went_well: { type: "string" },
+      needs_improvement: { type: "string" },
+      summary: { type: "string" },
+      confidence_score: { type: "number" },
+    },
+    required: [
+      "response_organization", "technical_knowledge", "problem_solving",
+      "position_application", "timing", "personability",
+      "best_part_quote", "best_part_explanation",
+      "worst_part_quote", "worst_part_explanation",
+      "what_went_well", "needs_improvement", "summary", "confidence_score",
+    ],
+    additionalProperties: false,
+  };
+
+  return {
+    type: "json_schema",
+    name: "interview_feedback",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        questions: {
+          type: "array",
+          items: questionSchema,
+          minItems: questionCount,
+          maxItems: questionCount,
+        },
+        overall: {
+          type: "object",
+          properties: {
+            response_organization: { type: "number" },
+            technical_knowledge: { type: "number" },
+            problem_solving: { type: "number" },
+            position_application: { type: "number" },
+            timing: { type: "number" },
+            personability: { type: "number" },
+            what_went_well: { type: "string" },
+            needs_improvement: { type: "string" },
+            summary: { type: "string" },
+          },
+          required: [
+            "response_organization", "technical_knowledge", "problem_solving",
+            "position_application", "timing", "personability",
+            "what_went_well", "needs_improvement", "summary",
+          ],
+          additionalProperties: false,
+        },
+      },
+      required: ["questions", "overall"],
+      additionalProperties: false,
+    },
+  };
+}
+
 export default async function handler(req, res) {
   log("info", "Request received", { method: req.method });
   if (req.method !== "POST") return res.status(405).end();
@@ -51,7 +120,7 @@ export default async function handler(req, res) {
         input: `
 You are a strict but supportive software engineering interviewer.
 
-For EACH question in the transcript, do ALL of the following:
+For EACH of the ${questions.length} questions in the transcript, do ALL of the following:
 1. Score these categories 0.0–100.0 with ONE decimal: response_organization, technical_knowledge, problem_solving, position_application, timing, personability
 2. Identify the BEST sentence EXACTLY as written. Put in "best_part_quote".
 3. Explain in 4-5 sentences in "best_part_explanation".
@@ -64,10 +133,11 @@ FOR THE OVERALL INTERVIEW:
 - Repeat the same six categories, overall.score = average
 - Provide overall what_went_well, needs_improvement, summary
 
-JSON FORMAT ONLY. DO NOT OMIT ANY FIELDS.
+You MUST return exactly ${questions.length} items in the "questions" array.
 Transcript:
 ${combined}
 `,
+        text: { format: buildSchema(questions.length) },
       }),
     });
 
@@ -78,10 +148,7 @@ ${combined}
     }
 
     const data = await response.json();
-    let rawText = (data.output_text ?? data.output?.[0]?.content?.[0]?.text ?? "").trim();
-
-    // Strip markdown fences
-    rawText = rawText.replace(/^```json\s*/, "").replace(/```$/, "").trim();
+    const rawText = (data.output_text ?? data.output?.[0]?.content?.[0]?.text ?? "").trim();
 
     let feedback;
     try {
@@ -89,15 +156,6 @@ ${combined}
     } catch (parseErr) {
       log("error", "JSON parse failed", { rawText: rawText.slice(0, 300) });
       return res.status(502).json({ error: "AI returned invalid JSON" });
-    }
-
-    // Validate question count
-    if (!feedback.questions || feedback.questions.length !== questions.length) {
-      log("error", "Invalid question count", {
-        expected: questions.length,
-        got: feedback.questions?.length,
-      });
-      return res.status(502).json({ error: "AI returned incomplete feedback. Please retry." });
     }
 
     // Calculate per-question scores
