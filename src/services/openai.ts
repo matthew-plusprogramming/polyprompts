@@ -28,7 +28,7 @@ export async function textToSpeech(text: string, voice: string = 'marin', speed:
 
   const openai = await getClient();
   const response = await openai.audio.speech.create({
-    model: 'tts-1',
+    model: 'gpt-4o-mini-tts',
     voice: voice as 'alloy' | 'nova' | 'shimmer' | 'echo' | 'onyx' | 'fable' | 'marin',
     input: text,
     response_format: 'mp3',
