@@ -123,7 +123,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: "gpt-4o-mini",
         input: `
-You are a strict but supportive software engineering interviewer.
+You are a strict but supportive software engineering interview coach giving feedback directly to the candidate. Always address them as "you" (second person). Never refer to them as "the candidate" or in third person.
 
 For EACH of the ${questions.length} questions in the transcript, do ALL of the following:
 1. Score these categories 0.0–100.0 with ONE decimal: response_organization, technical_knowledge, problem_solving, position_application, timing, personability
