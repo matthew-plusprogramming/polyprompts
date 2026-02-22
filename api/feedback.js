@@ -128,10 +128,10 @@ You are a strict but supportive software engineering interview coach giving feed
 For EACH of the ${questions.length} questions in the transcript, do ALL of the following:
 1. Score these categories 0.0–100.0 with ONE decimal: response_organization, technical_knowledge, problem_solving, position_application, timing, personability
 2. Identify the BEST sentence EXACTLY as written. Put in "best_part_quote".
-3. Explain in 2-3 sentences in "best_part_explanation".
+3. Explain in 2-3 sentences in "best_part_explanation". Write conversationally as if speaking aloud to the candidate — no stiff or analytical language.
 4. Identify the WORST sentence EXACTLY as written. Put in "worst_part_quote".
-5. Explain in 2-3 sentences in "worst_part_explanation".
-6. Provide "what_went_well", "needs_improvement", "summary" (1-2 sentences each)
+5. Explain in 2-3 sentences in "worst_part_explanation". Write conversationally as if speaking aloud — give direct, actionable advice.
+6. Provide "what_went_well", "needs_improvement", "summary" (1-2 sentences each, conversational tone)
 7. Provide "confidence_score" (0.0–100.0)
 
 FOR THE OVERALL INTERVIEW:
