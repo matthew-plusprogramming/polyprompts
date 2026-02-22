@@ -1414,7 +1414,7 @@ export default function InterviewScreen() {
                     gap: '6px',
                     padding: '4px 10px',
                     background: '#141414',
-                    border: `1px solid ${userSpeaking ? 'rgba(34,197,94,0.35)' : 'rgba(255,255,255,0.18)'}`,
+                    border: `1px solid ${userSpeaking ? 'rgba(163,230,53,0.35)' : 'rgba(255,255,255,0.18)'}`,
                     borderRadius: '999px',
                     transition: 'background 0.2s ease, border-color 0.2s ease',
                     zIndex: 2,
@@ -1425,8 +1425,8 @@ export default function InterviewScreen() {
                       width: '7px',
                       height: '7px',
                       borderRadius: '50%',
-                      background: userSpeaking ? '#22c55e' : '#64748b',
-                      boxShadow: userSpeaking ? '0 0 6px rgba(34,197,94,0.6)' : 'none',
+                      background: userSpeaking ? '#a3e635' : '#64748b',
+                      boxShadow: userSpeaking ? '0 0 6px rgba(163,230,53,0.6)' : 'none',
                       transition: 'all 0.15s ease',
                     }}
                   />
@@ -1436,7 +1436,7 @@ export default function InterviewScreen() {
                       fontSize: '10px',
                       fontWeight: '600',
                       letterSpacing: '0.06em',
-                      color: userSpeaking ? '#4ade80' : '#64748b',
+                      color: userSpeaking ? '#a3e635' : '#64748b',
                       transition: 'color 0.15s ease',
                     }}
                   >
