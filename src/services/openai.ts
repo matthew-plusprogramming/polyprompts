@@ -28,10 +28,10 @@ export async function textToSpeech(text: string, voice: string = 'marin', speed:
 
   const openai = await getClient();
   const response = await openai.audio.speech.create({
-    model: 'gpt-4o-mini-tts',
+    model: 'gpt-4o-mini-tts-2025-12-15',
     voice: voice as 'alloy' | 'nova' | 'shimmer' | 'echo' | 'onyx' | 'fable' | 'marin',
     input: text,
-    instructions: instructions ?? 'Speak warmly and conversationally, like a friendly interview coach encouraging the candidate. Be natural, clear, and supportive.',
+    instructions: instructions ?? 'Casual American female voice. Relaxed, steady pacing with natural micro-pauses between phrases. Slight upward inflection when asking questions. No vocal fry. Do not sound like a narrator or announcer — sound like a real person talking across a table.',
     response_format: 'mp3',
     speed: Math.max(0.25, Math.min(4.0, speed)), // OpenAI TTS supports 0.25-4.0
   });
