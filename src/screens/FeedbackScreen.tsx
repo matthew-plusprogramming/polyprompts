@@ -435,7 +435,7 @@ export default function FeedbackScreen() {
         <header className="feedback__header">
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <h1 className="feedback__title">Starly Summary</h1>
+              <h1 className="feedback__title">STARLY Summary</h1>
               {ttsPlaying && guidedPhase === 'idle' && (
                 <div className="voice-summary-indicator">
                   <div className="voice-summary-indicator__bar" />
