@@ -1,8 +1,17 @@
 import { useCallback, useRef, useState } from 'react';
+import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 import { createLogger } from '../utils/logger';
-import type { FaceMetrics, FaceMeshInstance, MediaPipeLandmark } from '../types/faceDetection';
+import type { FaceMetrics } from '../types/faceDetection';
 
 const log = createLogger('FaceDetection');
+
+const VISION_WASM_URL =
+  'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/wasm';
+const MODEL_URL =
+  'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+
+// ─── Landmark type ───────────────────────────────────────────────────────────
+type Landmark = { x: number; y: number; z: number };
 
 // ─── Landmark indices ────────────────────────────────────────────────────────
 const EYE_LANDMARKS = {
@@ -13,19 +22,17 @@ const NOSE_TIP = 1;
 const CHIN = 152;
 const LEFT_EAR = 234;
 const RIGHT_EAR = 454;
-// const UPPER_LIP = 13;
-// const LOWER_LIP = 14;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-function dist3(a: MediaPipeLandmark, b: MediaPipeLandmark): number {
-  return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2 + ((a.z ?? 0) - (b.z ?? 0)) ** 2);
+function dist3(a: Landmark, b: Landmark): number {
+  return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2);
 }
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
 
-function estimateHeadPose(lm: MediaPipeLandmark[]) {
+function estimateHeadPose(lm: Landmark[]) {
   const noseTip = lm[NOSE_TIP];
   const chin = lm[CHIN];
   const leftEar = lm[LEFT_EAR];
@@ -41,13 +48,13 @@ function estimateHeadPose(lm: MediaPipeLandmark[]) {
   return { yaw, pitch };
 }
 
-function eyeOpenness(lm: MediaPipeLandmark[], eye: { top: number; bottom: number; left: number; right: number }): number {
+function eyeOpenness(lm: Landmark[], eye: { top: number; bottom: number; left: number; right: number }): number {
   const h = Math.abs(lm[eye.top].y - lm[eye.bottom].y);
   const w = Math.abs(lm[eye.right].x - lm[eye.left].x);
   return w > 0 ? h / w : 0;
 }
 
-function gazeScore(lm: MediaPipeLandmark[]): number {
+function gazeScore(lm: Landmark[]): number {
   const le = EYE_LANDMARKS.leftEye;
   const re = EYE_LANDMARKS.rightEye;
   const leftIrisX = lm[le.center]?.x ?? (lm[le.left].x + lm[le.right].x) / 2;
@@ -78,21 +85,6 @@ class RingBuffer {
   }
 }
 
-// ─── CDN script loader ───────────────────────────────────────────────────────
-function loadScript(src: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (document.querySelector(`script[src="${src}"]`)) {
-      resolve();
-      return;
-    }
-    const s = document.createElement('script');
-    s.src = src;
-    s.onload = () => resolve();
-    s.onerror = reject;
-    document.head.appendChild(s);
-  });
-}
-
 // ─── Hook types ──────────────────────────────────────────────────────────────
 type FaceDetectionStatus = 'idle' | 'loading' | 'active' | 'error';
 
@@ -105,9 +97,10 @@ export function useFaceDetection({ videoElement, enabled }: UseFaceDetectionOpti
   const [status, setStatus] = useState<FaceDetectionStatus>('idle');
   const [isActive, setIsActive] = useState(false);
 
-  const faceMeshRef = useRef<FaceMeshInstance | null>(null);
+  const faceLandmarkerRef = useRef<FaceLandmarker | null>(null);
   const rafIdRef = useRef<number | null>(null);
   const activeRef = useRef(false);
+  const lastVideoTimeRef = useRef(-1);
 
   // ── EMA-smoothed values ──
   const gazeSmooth = useRef(0);
@@ -148,19 +141,7 @@ export function useFaceDetection({ videoElement, enabled }: UseFaceDetectionOpti
 
   const noFaceFrames = useRef(0);
 
-  const processResults = useCallback((results: { multiFaceLandmarks?: MediaPipeLandmark[][] }) => {
-    if (!results.multiFaceLandmarks?.length) {
-      noFaceFrames.current++;
-      if (noFaceFrames.current === 1 || noFaceFrames.current % 90 === 0) {
-        log.warn('No face detected', { consecutiveFrames: noFaceFrames.current });
-      }
-      return;
-    }
-    if (noFaceFrames.current > 0) {
-      log.info('Face re-detected', { missedFrames: noFaceFrames.current });
-      noFaceFrames.current = 0;
-    }
-    const lm = results.multiFaceLandmarks[0];
+  const processLandmarks = useCallback((lm: Landmark[]) => {
     sessionFrames.current++;
 
     // Gaze / eye contact
@@ -235,64 +216,76 @@ export function useFaceDetection({ videoElement, enabled }: UseFaceDetectionOpti
   const runLoop = useCallback(() => {
     if (!activeRef.current) return;
     const video = videoElement.current;
-    const mesh = faceMeshRef.current;
-    if (video && mesh && video.readyState >= 2) {
-      sendFrameCount.current++;
-      mesh.send({ image: video }).catch((err) => {
-        sendErrorCount.current++;
-        if (sendErrorCount.current === 1 || sendErrorCount.current % 30 === 0) {
-          log.warn('FaceMesh send failed', { errorCount: sendErrorCount.current, error: String(err) });
+    const landmarker = faceLandmarkerRef.current;
+    if (video && landmarker && video.readyState >= 2) {
+      // Only process new video frames (rAF may fire faster than video framerate)
+      if (video.currentTime !== lastVideoTimeRef.current) {
+        lastVideoTimeRef.current = video.currentTime;
+        sendFrameCount.current++;
+        try {
+          const result = landmarker.detectForVideo(video, performance.now());
+          if (result.faceLandmarks?.length) {
+            if (noFaceFrames.current > 0) {
+              log.info('Face re-detected', { missedFrames: noFaceFrames.current });
+              noFaceFrames.current = 0;
+            }
+            processLandmarks(result.faceLandmarks[0] as Landmark[]);
+          } else {
+            noFaceFrames.current++;
+            if (noFaceFrames.current === 1 || noFaceFrames.current % 90 === 0) {
+              log.warn('No face detected', { consecutiveFrames: noFaceFrames.current });
+            }
+          }
+        } catch (err) {
+          sendErrorCount.current++;
+          if (sendErrorCount.current === 1 || sendErrorCount.current % 30 === 0) {
+            log.warn('FaceLandmarker detect failed', { errorCount: sendErrorCount.current, error: String(err) });
+          }
         }
-      });
-      if (sendFrameCount.current === 1 || sendFrameCount.current % 150 === 0) {
-        log.info('rAF loop status', {
-          framesSent: sendFrameCount.current,
-          sendErrors: sendErrorCount.current,
-          skipped: skipCount.current,
-          processedFrames: sessionFrames.current,
-        });
+        if (sendFrameCount.current === 1 || sendFrameCount.current % 150 === 0) {
+          log.info('rAF loop status', {
+            framesSent: sendFrameCount.current,
+            sendErrors: sendErrorCount.current,
+            skipped: skipCount.current,
+            processedFrames: sessionFrames.current,
+          });
+        }
       }
     } else {
       skipCount.current++;
       if (skipCount.current === 1 || skipCount.current % 60 === 0) {
         log.warn('rAF skipping frame', {
           hasVideo: !!video,
-          hasMesh: !!mesh,
+          hasLandmarker: !!landmarker,
           videoReady: video?.readyState,
           skipped: skipCount.current,
         });
       }
     }
     rafIdRef.current = requestAnimationFrame(runLoop);
-  }, [videoElement]);
+  }, [videoElement, processLandmarks]);
 
   const start = useCallback(async () => {
     if (!enabled) return;
     if (activeRef.current) return;
 
     setStatus('loading');
-    log.info('Loading MediaPipe Face Mesh...');
+    log.info('Loading MediaPipe FaceLandmarker (tasks-vision)...');
 
     try {
-      await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js');
-
-      if (!window.FaceMesh) {
-        throw new Error('FaceMesh not available after script load');
-      }
-
-      const faceMesh = new window.FaceMesh({
-        locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+      const vision = await FilesetResolver.forVisionTasks(VISION_WASM_URL);
+      const faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: MODEL_URL,
+          delegate: 'GPU',
+        },
+        runningMode: 'VIDEO',
+        numFaces: 1,
+        outputFaceBlendshapes: false,
+        outputFacialTransformationMatrixes: false,
       });
 
-      faceMesh.setOptions({
-        maxNumFaces: 1,
-        refineLandmarks: true,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5,
-      });
-
-      faceMesh.onResults(processResults);
-      faceMeshRef.current = faceMesh;
+      faceLandmarkerRef.current = faceLandmarker;
 
       activeRef.current = true;
       setIsActive(true);
@@ -303,7 +296,8 @@ export function useFaceDetection({ videoElement, enabled }: UseFaceDetectionOpti
       sendErrorCount.current = 0;
       skipCount.current = 0;
       noFaceFrames.current = 0;
-      log.info('Face Mesh active, starting rAF loop', {
+      lastVideoTimeRef.current = -1;
+      log.info('FaceLandmarker active, starting rAF loop', {
         videoReady: videoElement.current?.readyState,
         videoWidth: videoElement.current?.videoWidth,
         videoHeight: videoElement.current?.videoHeight,
@@ -313,7 +307,7 @@ export function useFaceDetection({ videoElement, enabled }: UseFaceDetectionOpti
       log.warn('Face detection failed to start — interview continues without it', { error: String(err) });
       setStatus('error');
     }
-  }, [enabled, processResults, resetAccumulators, runLoop]);
+  }, [enabled, resetAccumulators, runLoop, videoElement]);
 
   const stop = useCallback(() => {
     log.info('Face detection stopping', {
@@ -328,6 +322,10 @@ export function useFaceDetection({ videoElement, enabled }: UseFaceDetectionOpti
     if (rafIdRef.current != null) {
       cancelAnimationFrame(rafIdRef.current);
       rafIdRef.current = null;
+    }
+    if (faceLandmarkerRef.current) {
+      faceLandmarkerRef.current.close();
+      faceLandmarkerRef.current = null;
     }
     setStatus('idle');
   }, []);

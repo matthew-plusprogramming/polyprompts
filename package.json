@@ -12,6 +12,7 @@
     "test:ui": "playwright test --ui"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.32",
     "@ricky0123/vad-react": "^0.0.36",
     "@ricky0123/vad-web": "^0.0.30",
     "@supabase/supabase-js": "^2.97.0",
