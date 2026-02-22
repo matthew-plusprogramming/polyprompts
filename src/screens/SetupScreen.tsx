@@ -149,7 +149,7 @@ function RoleCard({ role, selected, onClick }: { role: (typeof ROLES)[number]; s
           : hov
             ? 'rgba(255,255,255,0.03)'
             : 'rgba(255,255,255,0.015)',
-        border: `1.5px solid ${selected ? `${role.color}55` : hov ? `${role.color}28` : '#1c1c2a'}`,
+        border: `1.5px solid ${selected ? `${role.color}55` : hov ? `${role.color}28` : '#1c1c1c'}`,
         borderRadius: '14px',
         padding: '18px 16px',
         cursor: 'pointer',
@@ -253,7 +253,7 @@ function DifficultyPill({
           : hov
             ? 'rgba(255,255,255,0.025)'
             : 'transparent',
-        border: `1.5px solid ${selected ? `${diff.color}65` : hov ? `${diff.color}28` : '#1c1c2a'}`,
+        border: `1.5px solid ${selected ? `${diff.color}65` : hov ? `${diff.color}28` : '#1c1c1c'}`,
         borderRadius: '12px',
         cursor: 'pointer',
         transition: 'all 0.22s cubic-bezier(0.34,1.56,0.64,1)',
@@ -308,7 +308,7 @@ function CategoryChip({ cat, selected, onClick }: { cat: (typeof CATEGORIES)[num
           : hov
             ? 'rgba(99,102,241,0.07)'
             : 'rgba(255,255,255,0.02)',
-        border: `1.5px solid ${selected ? '#6366f1' : hov ? '#6366f175' : '#1c1c2a'}`,
+        border: `1.5px solid ${selected ? '#6366f1' : hov ? '#6366f175' : '#1c1c1c'}`,
         borderRadius: '100px',
         cursor: 'pointer',
         display: 'flex',
@@ -728,7 +728,7 @@ function ResumeUpload({
           </div>
         </div>
 
-        <div style={{ width: '100%', height: '3px', background: '#1c1c2a', borderRadius: '100px', overflow: 'hidden' }}>
+        <div style={{ width: '100%', height: '3px', background: '#1c1c1c', borderRadius: '100px', overflow: 'hidden' }}>
           <div
             style={{
               height: '100%',
@@ -862,7 +862,7 @@ function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (mode: Mode) => 
         display: 'flex',
         gap: '0',
         background: '#0d0d16',
-        border: '1px solid #1c1c2a',
+        border: '1px solid #1c1c1c',
         borderRadius: '10px',
         padding: '4px',
       }}
@@ -985,7 +985,7 @@ function StarModal({ onClose }: { onClose: () => void }) {
                 fontFamily: "'Josefin Sans', sans-serif",
                 fontSize: '24px',
                 fontWeight: '800',
-                color: '#f9fafb',
+                color: '#f5f5f5',
                 letterSpacing: '-0.02em',
               }}
             >
@@ -1409,7 +1409,7 @@ export default function SetupScreen() {
                 fontWeight: '800',
                 letterSpacing: '-0.03em',
                 lineHeight: 1.1,
-                color: '#f9fafb',
+                color: '#f5f5f5',
                 marginBottom: '14px',
               }}
             >
@@ -1587,7 +1587,7 @@ export default function SetupScreen() {
                         style={{
                           width: '100%',
                           background: 'rgba(255,255,255,0.02)',
-                          border: `1.5px solid ${jobDescription.trim() ? '#6366f155' : '#1c1c2a'}`,
+                          border: `1.5px solid ${jobDescription.trim() ? '#6366f155' : '#1c1c1c'}`,
                           borderRadius: '12px',
                           padding: '12px 14px',
                           fontFamily: "'Josefin Sans', sans-serif",
@@ -1599,7 +1599,7 @@ export default function SetupScreen() {
                           lineHeight: 1.5,
                         }}
                         onFocus={(e) => { e.currentTarget.style.borderColor = '#6366f177'; }}
-                        onBlur={(e) => { e.currentTarget.style.borderColor = jobDescription.trim() ? '#6366f155' : '#1c1c2a'; }}
+                        onBlur={(e) => { e.currentTarget.style.borderColor = jobDescription.trim() ? '#6366f155' : '#1c1c1c'; }}
                       />
                       {!jobDescription.trim() && (
                         <div
@@ -1650,7 +1650,7 @@ export default function SetupScreen() {
             <div
               style={{
                 height: '1px',
-                background: 'linear-gradient(90deg,transparent,#1c1c2a 30%,#1c1c2a 70%,transparent)',
+                background: 'linear-gradient(90deg,transparent,#1c1c1c 30%,#1c1c1c 70%,transparent)',
                 marginBottom: '24px',
               }}
             />

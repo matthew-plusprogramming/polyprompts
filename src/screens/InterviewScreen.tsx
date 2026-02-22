@@ -1072,7 +1072,7 @@ export default function InterviewScreen() {
             fontWeight: 700,
             color: '#041018',
             fontFamily: "'Josefin Sans', sans-serif",
-            background: 'linear-gradient(135deg, #f3f3f3 5%, #dcdcdc 52%, #b8b8b8 100%)',
+            background: 'linear-gradient(135deg, #f5f5f5 5%, #dcdcdc 52%, #b8b8b8 100%)',
             border: '1px solid rgba(255, 255, 255, 0.45)',
             borderRadius: '14px',
             padding: '0.52rem 1rem',
@@ -1122,7 +1122,7 @@ export default function InterviewScreen() {
                 padding: '0.55rem 0.95rem',
                 borderRadius: '12px',
                 border: '1px solid rgba(255, 255, 255, 0.45)',
-                background: 'linear-gradient(130deg, #ffffff, #dcdcdc 45%, #bdbdbd)',
+                background: 'linear-gradient(130deg, #ffffff, #dcdcdc 45%, #b3b3b3)',
                 color: '#111111',
                 fontSize: '0.9rem',
                 fontWeight: 700,
@@ -1213,7 +1213,7 @@ export default function InterviewScreen() {
               style={{
                 margin: '10px 0 0',
                 fontSize: '14px',
-                color: '#64748b',
+                color: '#6b7280',
               }}
             >
               {state.questions.length > 1
@@ -1277,7 +1277,7 @@ export default function InterviewScreen() {
                 borderRadius: '22px 10px 22px 10px',
                 overflow: 'hidden',
                 background: 'linear-gradient(165deg, rgba(10, 20, 37, 0.88), rgba(6, 12, 23, 0.95))',
-                color: '#f7f7f7',
+                color: '#f5f5f5',
                 position: 'relative',
                 boxShadow: 'inset 0 0 26px rgba(255, 255, 255, 0.05), 0 10px 24px rgba(0, 0, 0, 0.35)',
               }}
@@ -1331,7 +1331,7 @@ export default function InterviewScreen() {
                           borderRadius: '8px',
                           border: '1px solid rgba(255, 255, 255, 0.22)',
                           background: 'rgba(255, 255, 255, 0.06)',
-                          color: '#f2f2f2',
+                          color: '#f5f5f5',
                           cursor: 'pointer',
                         }}
                       >
@@ -1408,7 +1408,7 @@ export default function InterviewScreen() {
                       width: '7px',
                       height: '7px',
                       borderRadius: '50%',
-                      background: userSpeaking ? '#22c55e' : '#64748b',
+                      background: userSpeaking ? '#22c55e' : '#6b7280',
                       boxShadow: userSpeaking ? '0 0 6px rgba(34,197,94,0.6)' : 'none',
                       transition: 'all 0.15s ease',
                     }}
@@ -1419,7 +1419,7 @@ export default function InterviewScreen() {
                       fontSize: '10px',
                       fontWeight: '600',
                       letterSpacing: '0.06em',
-                      color: userSpeaking ? '#4ade80' : '#64748b',
+                      color: userSpeaking ? '#4ade80' : '#6b7280',
                       transition: 'color 0.15s ease',
                     }}
                   >
@@ -1662,7 +1662,7 @@ export default function InterviewScreen() {
                 paddingRight: '0.2rem',
               }}
             >
-              <p style={{ marginTop: 0, lineHeight: 1.54, color: '#d7d7d7' }}>
+              <p style={{ marginTop: 0, lineHeight: 1.54, color: '#d4d4d4' }}>
                 {state.liveTranscript || deepgram.transcript || (
                   phase === 'ready'
                     ? 'Click "Start" to begin the interview. Your transcript will appear here as you speak.'

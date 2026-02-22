@@ -81,13 +81,13 @@ function PerformanceSummary({
     fontFamily: "'Josefin Sans', sans-serif",
     fontSize: '15px',
     fontWeight: '800',
-    color: '#f9fafb',
+    color: '#f5f5f5',
     letterSpacing: '-0.01em',
   };
 
   const summaryTextStyle: CSSProperties = {
     fontSize: '14px',
-    color: '#cbd5e1',
+    color: '#d4d4d4',
     lineHeight: 1.7,
     marginBottom: '20px',
   };
@@ -170,7 +170,7 @@ function PerformanceSummary({
 
   const calloutCardStyle: CSSProperties = {
     background: 'rgba(255,255,255,0.018)',
-    border: '1px solid #1c1c2a',
+    border: '1px solid #1c1c1c',
     borderLeft: '3px solid #22c55e',
     borderRadius: '12px',
     padding: '14px 16px',

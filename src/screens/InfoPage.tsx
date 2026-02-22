@@ -101,7 +101,7 @@ export default function InfoPage() {
 
         .info-page {
           height: 100vh;
-          color: #f7f7f7;
+          color: #f5f5f5;
           font-family: 'Josefin Sans', 'Segoe UI', sans-serif;
           background: black;
           position: relative;
@@ -185,7 +185,7 @@ export default function InfoPage() {
           font-size: clamp(2rem, 7.8vw, 5.2rem);
           line-height: 0.98;
           font-weight: 700;
-          color: #f7f7f7;
+          color: #f5f5f5;
           text-wrap: balance;
         }
 
@@ -193,7 +193,7 @@ export default function InfoPage() {
           margin: 18px 0 0;
           font-size: clamp(0.95rem, 2.1vw, 1.3rem);
           line-height: 1.25;
-          color: #d9d9d9;
+          color: #d4d4d4;
           text-wrap: balance;
         }
 
@@ -213,7 +213,7 @@ export default function InfoPage() {
           border: none;
           border-radius: 999px;
           background: #cbff70;
-          color: #0d1012;
+          color: #0a0a0a;
           font-size: 1.5rem;
           display: grid;
           place-items: center;
@@ -251,7 +251,7 @@ export default function InfoPage() {
           font-size: clamp(1.8rem, 5vw, 3.2rem);
           line-height: 1.12;
           font-weight: 700;
-          color: #f3f3f3;
+          color: #f5f5f5;
           text-wrap: balance;
           opacity: 0;
           transform: translateY(-20px);
@@ -397,7 +397,7 @@ export default function InfoPage() {
         .peak-number {
           position: absolute;
           transform: translate(-50%, 50%);
-          color: #f4f4f4;
+          color: #f5f5f5;
           font-size: clamp(1.2rem, 2.8vw, 1.9rem);
           font-weight: 700;
           opacity: 0;
@@ -548,7 +548,7 @@ export default function InfoPage() {
           width: 100%;
           max-width: none;
           display: block;
-          color: #dfdfdf;
+          color: #d4d4d4;
           font-size: 0.96rem;
           text-align: center;
           line-height: 1.1;
@@ -612,7 +612,7 @@ export default function InfoPage() {
                 <svg viewBox="0 0 24 24" fill="none">
                   <path
                     d="M5 3 L19 12 L5 21 Z"
-                    stroke="#1b1d20"
+                    stroke="#0a0a0a"
                     strokeWidth="1.7"
                     strokeLinejoin="round"
                   />
@@ -658,7 +658,7 @@ export default function InfoPage() {
                         className="bar-fill"
                         style={{
                           height: barsVisible ? `${barHeights[0]}%` : '0%',
-                          background: '#cfcfcf',
+                          background: '#d4d4d4',
                         }}
                       />
                     </div>

@@ -1,7 +1,7 @@
 .feedback {
   min-height: 100vh;
   padding: 3.5rem 2.5rem 4.5rem;
-  color: #f7f7f7;
+  color: #f5f5f5;
   font-family: 'Josefin Sans', sans-serif;
   background: black;
   position: relative;
@@ -67,7 +67,7 @@
   text-transform: uppercase;
   letter-spacing: 0.28em;
   font-size: 0.65rem;
-  color: #bdbdbd;
+  color: #b3b3b3;
   margin: 0 0 0.75rem;
 }
 
@@ -80,14 +80,14 @@
 .feedback__subtitle {
   max-width: 520px;
   margin: 0;
-  color: #cfcfcf;
+  color: #d4d4d4;
 }
 
 .feedback__meta {
   display: grid;
   gap: 0.75rem;
   padding: 1.25rem 1.5rem;
-  border: 1px solid #222;
+  border: 1px solid #2a2a2a;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.03);
   box-shadow: 0 0 30px rgba(255, 255, 255, 0.08);
@@ -99,7 +99,7 @@
   font-size: 0.75rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #909090;
+  color: #9e9e9e;
   margin-bottom: 0.2rem;
 }
 
@@ -160,7 +160,7 @@
   font-size: 0.6rem;
   text-transform: uppercase;
   letter-spacing: 0.14em;
-  fill: #d7d7d7;
+  fill: #d4d4d4;
 }
 
 .scoreboard__overall {
@@ -179,7 +179,7 @@
   font-size: 0.7rem;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: #9f9f9f;
+  color: #9e9e9e;
 }
 
 .scoreboard__overall strong {
@@ -188,7 +188,7 @@
 
 .scoreboard__overall em {
   font-style: normal;
-  color: #a9a9a9;
+  color: #9e9e9e;
   font-size: 0.8rem;
 }
 
@@ -237,12 +237,12 @@
   font-size: 0.65rem;
   text-transform: uppercase;
   letter-spacing: 0.14em;
-  color: #b2b2b2;
+  color: #b3b3b3;
 }
 
 .scoreboard__row-header strong {
   font-size: 0.82rem;
-  color: #f1f1f1;
+  color: #f5f5f5;
   margin-left: auto;
   font-variant-numeric: tabular-nums;
 }
@@ -267,7 +267,7 @@
 .scoreboard__note {
   margin: 0;
   font-size: 0.7rem;
-  color: #c9c9c9;
+  color: #d4d4d4;
   max-height: 0;
   opacity: 0;
   overflow: hidden;
@@ -354,7 +354,7 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
   padding: 0.4rem 1.1rem;
   background: transparent;
-  color: #f7f7f7;
+  color: #f5f5f5;
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.16em;
@@ -378,14 +378,14 @@
   text-transform: uppercase;
   letter-spacing: 0.18em;
   font-size: 0.6rem;
-  color: #9d9d9d;
+  color: #9e9e9e;
   margin-bottom: 0.35rem;
 }
 
 .feedback__review-block p {
   margin: 0;
   font-size: 0.82rem;
-  color: #e2e2e2;
+  color: #e2e8f0;
 }
 
 .feedback__review-critique {
@@ -402,7 +402,7 @@
   text-transform: uppercase;
   letter-spacing: 0.16em;
   font-size: 0.6rem;
-  color: #b6b6b6;
+  color: #b3b3b3;
 }
 
 .feedback__review-critique strong {
@@ -431,7 +431,7 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
   padding: 0.35rem 0.9rem;
   background: transparent;
-  color: #f7f7f7;
+  color: #f5f5f5;
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.16em;
@@ -440,7 +440,7 @@
 .feedback__list {
   padding-left: 1.2rem;
   margin: 0.75rem 0 0;
-  color: #d6d6d6;
+  color: #d4d4d4;
 }
 
 .feedback__list li {
@@ -459,8 +459,8 @@
   padding: 0.85rem 2.2rem;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  background: #f4f4f4;
-  color: #0c0c0c;
+  background: #f5f5f5;
+  color: #0a0a0a;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.2em;
@@ -475,7 +475,7 @@
 
 .feedback__button--ghost {
   background: transparent;
-  color: #f7f7f7;
+  color: #f5f5f5;
 }
 
 /* ── Body Language card ── */
@@ -508,7 +508,7 @@
   font-size: 0.75rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #b2b2b2;
+  color: #b3b3b3;
 }
 
 .body-language__row-header strong {
