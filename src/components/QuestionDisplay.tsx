@@ -92,7 +92,7 @@ export default function QuestionDisplay({ question }: Props) {
               letterSpacing: '0.06em',
               textTransform: 'uppercase',
               color: diff.color,
-              fontFamily: "'Syne', sans-serif",
+              fontFamily: "'Josefin Sans', sans-serif",
             }}
           >
             {diff.label}
@@ -118,7 +118,7 @@ export default function QuestionDisplay({ question }: Props) {
                 letterSpacing: '0.06em',
                 textTransform: 'uppercase',
                 color: '#a5b4fc',
-                fontFamily: "'Syne', sans-serif",
+                fontFamily: "'Josefin Sans', sans-serif",
               }}
             >
               {category}
@@ -136,7 +136,7 @@ export default function QuestionDisplay({ question }: Props) {
           letterSpacing: '-0.01em',
           color: '#f9fafb',
           margin: 0,
-          fontFamily: "'Syne', sans-serif",
+          fontFamily: "'Josefin Sans', sans-serif",
         }}
       >
         {question.text}

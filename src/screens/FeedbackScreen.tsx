@@ -164,8 +164,7 @@ export default function FeedbackScreen() {
   }, [stopPlayback]);
 
   const runGuidedReview = useCallback(async () => {
-    const { ttsVoice, ttsSpeed } = state;
-    const guidedSpeed = Math.min(4.0, ttsSpeed);
+    const { ttsVoice } = state;
     const questions = feedbackResponse?.questions ?? [];
     const overallData = feedbackResponse?.overall;
 
@@ -187,12 +186,12 @@ export default function FeedbackScreen() {
       if (q.worst_part_explanation) allTexts.push(q.worst_part_explanation);
     }
     allTexts.push(outroText);
-    prefetchTTS(allTexts, ttsVoice, guidedSpeed, FEEDBACK_TTS_INSTRUCTIONS);
+    prefetchTTS(allTexts, ttsVoice, 1.0, FEEDBACK_TTS_INSTRUCTIONS);
 
     // Intro
     setGuidedPhase('intro');
     setGuidedQuestionIdx(-1);
-    try { await speak(introText, { voice: ttsVoice, speed: guidedSpeed, instructions: FEEDBACK_TTS_INSTRUCTIONS }); } catch { /* interrupted */ }
+    try { await speak(introText, { voice: ttsVoice, speed: 1.0, instructions: FEEDBACK_TTS_INSTRUCTIONS }); } catch { /* interrupted */ }
     if (guidedCancelledRef.current) return;
 
     // Per-question loop
@@ -214,7 +213,7 @@ export default function FeedbackScreen() {
         if (guidedCancelledRef.current) return;
 
         setGuidedPhase('narrate-best');
-        try { await speak(qFeedback.best_part_explanation, { voice: ttsVoice, speed: guidedSpeed, instructions: FEEDBACK_TTS_INSTRUCTIONS }); } catch { /* interrupted */ }
+        try { await speak(qFeedback.best_part_explanation, { voice: ttsVoice, speed: 1.0, instructions: FEEDBACK_TTS_INSTRUCTIONS }); } catch { /* interrupted */ }
         if (guidedCancelledRef.current) return;
       }
 
@@ -225,7 +224,7 @@ export default function FeedbackScreen() {
         if (guidedCancelledRef.current) return;
 
         setGuidedPhase('narrate-worst');
-        try { await speak(qFeedback.worst_part_explanation, { voice: ttsVoice, speed: guidedSpeed, instructions: FEEDBACK_TTS_INSTRUCTIONS }); } catch { /* interrupted */ }
+        try { await speak(qFeedback.worst_part_explanation, { voice: ttsVoice, speed: 1.0, instructions: FEEDBACK_TTS_INSTRUCTIONS }); } catch { /* interrupted */ }
         if (guidedCancelledRef.current) return;
       }
     }
@@ -234,7 +233,7 @@ export default function FeedbackScreen() {
     if (guidedCancelledRef.current) return;
     setGuidedPhase('outro');
     setGuidedQuestionIdx(-1);
-    try { await speak(outroText, { voice: ttsVoice, speed: guidedSpeed, instructions: FEEDBACK_TTS_INSTRUCTIONS }); } catch { /* interrupted */ }
+    try { await speak(outroText, { voice: ttsVoice, speed: 1.0, instructions: FEEDBACK_TTS_INSTRUCTIONS }); } catch { /* interrupted */ }
 
     setGuidedPhase('idle');
     setGuidedQuestionIdx(0);
@@ -250,7 +249,7 @@ export default function FeedbackScreen() {
 
     hasPlayedSummaryRef.current = true;
     log.info('Auto-playing voice summary');
-    speak(state.voiceSummary, { voice: state.ttsVoice, speed: state.ttsSpeed, instructions: FEEDBACK_TTS_INSTRUCTIONS }).catch((err) => {
+    speak(state.voiceSummary, { voice: state.ttsVoice, speed: 1.0, instructions: FEEDBACK_TTS_INSTRUCTIONS }).catch((err) => {
       log.warn('Voice summary playback failed', { error: String(err) });
     });
   }, [state.voiceSummary, feedbackResponse, guidedPhase, speak, state.ttsVoice, state.ttsSpeed]);
@@ -338,7 +337,6 @@ export default function FeedbackScreen() {
     const overallData = feedbackResponse.overall;
     if (!overallData || questions.length === 0) return;
 
-    const guidedSpeed = Math.min(4.0, state.ttsSpeed);
     const introText = `Let's review your interview. You scored ${Math.round(overallData.score)}% overall. Let me walk you through each question.`;
     const outroText = overallData.summary || 'That completes your interview review. Keep practicing!';
     const allTexts = [introText];
@@ -348,7 +346,7 @@ export default function FeedbackScreen() {
     }
     allTexts.push(outroText);
     log.info('Prefetching guided review TTS', { textCount: allTexts.length });
-    prefetchTTS(allTexts, state.ttsVoice, guidedSpeed, FEEDBACK_TTS_INSTRUCTIONS);
+    prefetchTTS(allTexts, state.ttsVoice, 1.0, FEEDBACK_TTS_INSTRUCTIONS);
   }, [feedbackResponse, state.ttsSpeed, state.ttsVoice]);
 
   const getDimensionValue = (key: DimensionKey): number => {
@@ -567,6 +565,11 @@ export default function FeedbackScreen() {
                 <em>
                   {hasResult ? "Composite score" : "Awaiting scoring"}
                 </em>
+                {hasResult && overall?.confidence_score != null && (
+                  <span style={{ fontSize: '0.6rem', color: '#6b6b6b', marginTop: '2px', display: 'block' }}>
+                    {Math.round(overall.confidence_score)}% confidence
+                  </span>
+                )}
               </div>
             </div>
 

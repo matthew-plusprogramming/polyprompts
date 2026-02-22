@@ -23,7 +23,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "GROQ_API_KEY not set" });
   }
 
-  const { role, questionNumber, previousQuestions } = req.body ?? {};
+  const { role, questionNumber, previousQuestions, jobDescription } = req.body ?? {};
 
   try {
     const controller = new AbortController();
@@ -42,17 +42,15 @@ export default async function handler(req, res) {
             role: "user",
             content: `You are a behavioral interviewer conducting a Computer Science mock interview.
 
-Generate exactly ONE interview question for a ${role || "software engineering intern"}.
+Generate exactly ONE interview question for a ${role || "software engineering intern"}.${jobDescription ? `\n\nJob Description:\n${typeof jobDescription === "string" ? jobDescription.slice(0, 3000) : ""}` : ""}
 
 STRICT RULES:
 - Output ONLY the question itself
-- Do NOT include explanations
-- Do NOT include introductions, unless it's conversational phrases an interviewer would use
-- Do NOT include conclusions
+- Do NOT include explanations, conclusions, or preamble
 - Do NOT include phrases like "Sure!" or "Here is a question"
 - Do NOT include numbering
-- Maximum 2 sentences
-- Be concise and realistic
+- Keep it concise but allow enough detail for context — aim for 20–40 words
+- Do not ask questions requiring the candidate to reveal proprietary or confidential information${jobDescription ? '\n- Start with a brief, natural company/role context from the job description, e.g. "In this role you\'d be working on X — tell me about a time..." or "We value Y on our team — can you describe..." Keep the lead-in short (under 15 words) then ask the behavioral question' : '\n- A brief conversational lead-in like "Tell me about a time when..." is fine'}
 
 Previously asked questions:
 ${previousQuestions?.join("\n") || "None"}
@@ -61,7 +59,7 @@ Generate a NEW question that is different from the previous ones.`,
           },
         ],
         temperature: 0.8,
-        max_tokens: 150,
+        max_tokens: 250,
       }),
       signal: controller.signal,
     });
