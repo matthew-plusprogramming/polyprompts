@@ -463,12 +463,12 @@ export default function FeedbackScreen() {
               >
                 <defs>
                   <linearGradient id="radarFill" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stopColor="#ffffff" stopOpacity="0.4" />
-                    <stop offset="100%" stopColor="#bfbfbf" stopOpacity="0.12" />
+                    <stop offset="0%" stopColor="#a3e635" stopOpacity="0.4" />
+                    <stop offset="100%" stopColor="#65a30d" stopOpacity="0.12" />
                   </linearGradient>
                   <radialGradient id="radarGlow" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stopColor="#ffffff" stopOpacity="0.25" />
-                    <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+                    <stop offset="0%" stopColor="#a3e635" stopOpacity="0.25" />
+                    <stop offset="100%" stopColor="#a3e635" stopOpacity="0" />
                   </radialGradient>
                   <filter
                     id="softGlow"
@@ -478,8 +478,10 @@ export default function FeedbackScreen() {
                     height="200%"
                   >
                     <feGaussianBlur stdDeviation="6" result="blur" />
+                    <feFlood floodColor="#a3e635" floodOpacity="0.3" result="color" />
+                    <feComposite in="color" in2="blur" operator="in" result="coloredBlur" />
                     <feMerge>
-                      <feMergeNode in="blur" />
+                      <feMergeNode in="coloredBlur" />
                       <feMergeNode in="SourceGraphic" />
                     </feMerge>
                   </filter>
@@ -531,7 +533,7 @@ export default function FeedbackScreen() {
                 <polygon
                   points={radarPoints()}
                   fill="url(#radarFill)"
-                  stroke="rgba(255, 255, 255, 0.45)"
+                  stroke="rgba(163, 230, 53, 0.5)"
                   strokeWidth="1.2"
                   filter="url(#softGlow)"
                   className="scoreboard__shape"
