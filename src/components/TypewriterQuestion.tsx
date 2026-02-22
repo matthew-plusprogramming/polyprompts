@@ -87,7 +87,7 @@ export default function TypewriterQuestion({
         background: 'rgba(99,102,241,0.06)',
         border: '1px solid rgba(99,102,241,0.16)',
         borderRadius: '16px',
-        marginBottom: '0.6rem',
+        marginBottom: '0.4rem',
         overflow: 'hidden',
         transition: 'opacity 0.3s ease',
         opacity: visible ? 1 : 0,

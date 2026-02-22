@@ -1369,12 +1369,14 @@ export default function InterviewScreen() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '10px',
-                  padding: '8px 24px',
-                  marginBottom: '0.25rem',
+                  padding: active ? '8px 24px' : '0 24px',
+                  maxHeight: active ? '40px' : '0px',
+                  overflow: 'hidden',
                   borderRadius: '14px',
                   background: 'rgba(99,102,241,0.06)',
-                  border: '1px solid rgba(99,102,241,0.16)',
+                  border: active ? '1px solid rgba(99,102,241,0.16)' : '1px solid transparent',
                   animation: phase === 'thinking' ? 'breathing 2s ease-in-out infinite' : 'none',
+                  transition: 'max-height 0.3s ease, padding 0.3s ease, border-color 0.3s ease',
                 }}
               >
                 <div
