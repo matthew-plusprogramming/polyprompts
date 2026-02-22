@@ -32,7 +32,7 @@ type ScreenPhase =
 export default function InterviewScreen() {
   const { state, dispatch } = useInterview();
   const navigate = useNavigate();
-  const { speak, stopPlayback } = useTTS();
+  const { speak, stopPlayback, isPlaying: ttsPlaying, analyserNode: ttsAnalyserNode } = useTTS();
   const deepgram = useDeepgramTranscription();
 
   // ─── Main's camera state ───
@@ -661,8 +661,8 @@ export default function InterviewScreen() {
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   }, [elapsedSeconds]);
 
-  // Derive micEnabled for WaveformVisualizer from phase
-  const micEnabled = phase === 'recording' || phase === 'silence-detected' || phase === 'asking-done';
+  // Visualizer reacts to TTS audio (via analyserNode) and treats both user speech and TTS playback as "speaking"
+  const visualizerSpeaking = userSpeaking || ttsPlaying;
 
   // ─── Phase badge config ───
   // ─── Question progress indicator ───
@@ -1309,7 +1309,7 @@ export default function InterviewScreen() {
               }}
             >
               <div style={{ width: '100%', height: '100%', flex: '1 1 auto', minHeight: 0 }}>
-                <ParticleVisualizer micEnabled={micEnabled} isSpeaking={userSpeaking} />
+                <ParticleVisualizer analyserNode={ttsAnalyserNode} isSpeaking={visualizerSpeaking} />
               </div>
             </section>
           </div>
