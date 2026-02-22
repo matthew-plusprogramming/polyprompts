@@ -163,8 +163,7 @@ export default function FeedbackScreen() {
 
   const runGuidedReview = useCallback(async () => {
     const { ttsVoice, ttsSpeed } = state;
-    // 20% faster TTS for guided review narration
-    const guidedSpeed = Math.min(4.0, ttsSpeed * 1.2);
+    const guidedSpeed = Math.min(4.0, ttsSpeed);
     const questions = feedbackResponse?.questions ?? [];
     const overallData = feedbackResponse?.overall;
 
