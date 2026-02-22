@@ -133,7 +133,7 @@ export default function TypewriterQuestion({
             fontWeight: '700',
             letterSpacing: '0.12em',
             textTransform: 'uppercase',
-            color: isTyping ? '#a78bfa' : '#64748b',
+            color: isTyping ? '#a78bfa' : '#6b7280',
             transition: 'color 0.3s ease',
           }}
         >
@@ -150,7 +150,7 @@ export default function TypewriterQuestion({
           fontWeight: 700,
           lineHeight: 1.55,
           letterSpacing: '-0.005em',
-          color: '#f0f0f5',
+          color: '#f5f5f5',
           minHeight: '1.55em',
         }}
       >

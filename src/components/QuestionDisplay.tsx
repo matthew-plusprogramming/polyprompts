@@ -134,7 +134,7 @@ export default function QuestionDisplay({ question }: Props) {
           fontWeight: '700',
           lineHeight: 1.55,
           letterSpacing: '-0.01em',
-          color: '#f9fafb',
+          color: '#f5f5f5',
           margin: 0,
           fontFamily: "'Josefin Sans', sans-serif",
         }}

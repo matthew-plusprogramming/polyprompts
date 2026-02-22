@@ -116,7 +116,7 @@ function Sparkline({ label, color, values, attemptLabels }: SparklineProps) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, flexShrink: 0 }} />
-          <span style={{ fontFamily: "'Josefin Sans', sans-serif", fontSize: '10px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          <span style={{ fontFamily: "'Josefin Sans', sans-serif", fontSize: '10px', fontWeight: 600, color: '#9e9e9e', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             {label}
           </span>
         </div>
@@ -187,7 +187,7 @@ function OverallChart({ avgValues, attemptLabels }: OverallChartProps) {
   return (
     <div style={{ background: 'rgba(255,255,255,0.018)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '12px 14px 10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontFamily: "'Josefin Sans', sans-serif", fontSize: '10px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        <span style={{ fontFamily: "'Josefin Sans', sans-serif", fontSize: '10px', fontWeight: 600, color: '#9e9e9e', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           Average Score
         </span>
         <span style={{ fontFamily: "'Josefin Sans', sans-serif", fontSize: '11px', fontWeight: 700, color: netColor }}>
@@ -265,7 +265,7 @@ export default function ScoreTrendChart({ currentResult, previousAttempts }: Sco
           ↑
         </div>
         <div>
-          <div style={{ fontFamily: "'Josefin Sans', sans-serif", fontSize: '15px', fontWeight: 800, color: '#f9fafb', letterSpacing: '-0.01em' }}>
+          <div style={{ fontFamily: "'Josefin Sans', sans-serif", fontSize: '15px', fontWeight: 800, color: '#f5f5f5', letterSpacing: '-0.01em' }}>
             Score Trend
           </div>
           <div style={{ fontFamily: "'Josefin Sans', sans-serif", fontSize: '10px', color: '#4b5563', letterSpacing: '0.06em' }}>
@@ -292,7 +292,7 @@ export default function ScoreTrendChart({ currentResult, previousAttempts }: Sco
         ))}
       </div>
 
-      <div style={{ marginTop: '18px', paddingTop: '14px', borderTop: '1px solid #1c1c2a', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+      <div style={{ marginTop: '18px', paddingTop: '14px', borderTop: '1px solid #1c1c1c', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
         {([
           { color: '#22c55e', label: 'Improving' },
           { color: '#6b7280', label: 'Flat' },

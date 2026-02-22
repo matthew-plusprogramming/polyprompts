@@ -100,7 +100,7 @@ export default function TranscriptPanel({ transcript, interimText, isRecording }
               style={{
                 margin: 0,
                 fontSize: '16px',
-                color: '#e5e7eb',
+                color: '#e2e8f0',
                 lineHeight: 1.7,
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word',

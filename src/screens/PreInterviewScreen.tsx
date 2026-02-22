@@ -237,7 +237,7 @@ export default function PreInterviewScreen() {
         }
         .skip-btn {
           background: rgba(255,255,255,0.04);
-          border: 1px solid #1c1c2a;
+          border: 1px solid #1c1c1c;
           border-radius: 10px;
           color: #4b5563;
           cursor: pointer;

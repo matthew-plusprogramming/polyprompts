@@ -10,9 +10,9 @@ export default function HomeScreen() {
       style={{
         height: '100dvh',
         minHeight: '100dvh',
-        color: '#f5f7ff',
+        color: '#f5f5f5',
         backgroundImage: `linear-gradient(180deg, rgba(0, 0, 0, 0.96) 0%, rgba(0, 0, 0, 0.86) 30%, rgba(0, 0, 0, 0.52) 52%, rgba(0, 0, 0, 0.16) 70%, rgba(0, 0, 0, 0) 82%), url(${homePageBg})`,
-        backgroundColor: '#04050b',
+        backgroundColor: '#09090f',
         backgroundSize: '100% 100%, 100% auto',
         backgroundPosition: 'center top, center calc(100% + 15vh + 15px)',
         backgroundRepeat: 'no-repeat',
@@ -114,11 +114,11 @@ export default function HomeScreen() {
               fontSize: 'clamp(1.45rem, 2.9vw, 2.45rem)',
               lineHeight: 1.22,
               letterSpacing: '0.035em',
-              color: '#f3f6ff',
+              color: '#f5f5f5',
               fontWeight: 700,
             }}
           >
-            Introducing <span style={{ color: '#c9f36b' }}>STARLY</span>, the
+            Introducing <span style={{ color: '#cbff70' }}>STARLY</span>, the
             <br />
             Live AI Mock Interviewer
           </h1>
@@ -146,13 +146,13 @@ export default function HomeScreen() {
               marginTop: '22px',
               border: 'none',
               borderRadius: '14px',
-              background: '#c9f36b',
-              color: '#101317',
+              background: '#cbff70',
+              color: '#0a0a0a',
               fontWeight: 700,
               fontSize: '0.9rem',
               padding: '0.72rem 1.5rem',
               letterSpacing: '0.02em',
-              boxShadow: '0 10px 30px rgba(174, 243, 86, 0.32)',
+              boxShadow: '0 10px 30px rgba(203, 255, 112, 0.32)',
             }}
           >
             Start Interview

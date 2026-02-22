@@ -477,7 +477,7 @@ export default function FeedbackScreen() {
                 <polygon
                   points={gridPoints(1)}
                   fill="none"
-                  stroke="#2f2f2f"
+                  stroke="#2a2a2a"
                   strokeWidth="1.2"
                 />
                 <polygon
@@ -489,13 +489,13 @@ export default function FeedbackScreen() {
                 <polygon
                   points={gridPoints(0.5)}
                   fill="none"
-                  stroke="#232323"
+                  stroke="#2a2a2a"
                   strokeWidth="0.9"
                 />
                 <polygon
                   points={gridPoints(0.25)}
                   fill="none"
-                  stroke="#1a1a1a"
+                  stroke="#1c1c1c"
                   strokeWidth="0.8"
                 />
 
@@ -566,7 +566,7 @@ export default function FeedbackScreen() {
                   {hasResult ? "Composite score" : "Awaiting scoring"}
                 </em>
                 {hasResult && overall?.confidence_score != null && (
-                  <span style={{ fontSize: '0.6rem', color: '#6b6b6b', marginTop: '2px', display: 'block' }}>
+                  <span style={{ fontSize: '0.6rem', color: '#6b7280', marginTop: '2px', display: 'block' }}>
                     {Math.round(overall.confidence_score)}% confidence
                   </span>
                 )}
@@ -792,14 +792,14 @@ export default function FeedbackScreen() {
                                 fontSize: '0.65rem',
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.14em',
-                                color: '#9d9d9d',
+                                color: '#9e9e9e',
                               }}>
                                 Score: {Math.round(qFeedback.score)}%
                               </span>
                               {qFeedback.confidence_score != null && (
                                 <span style={{
                                   fontSize: '0.6rem',
-                                  color: '#6b6b6b',
+                                  color: '#6b7280',
                                 }}>
                                   Confidence: {Math.round(qFeedback.confidence_score)}%
                                 </span>
@@ -836,7 +836,7 @@ export default function FeedbackScreen() {
                                   )}
                                 </div>
                                 <p style={{ margin: 0, fontSize: '0.75rem', color: '#a7f3d0', fontStyle: 'italic' }}>"{qFeedback.best_part_quote}"</p>
-                                <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: '#9ca3af' }}>{qFeedback.best_part_explanation}</p>
+                                <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: '#9e9e9e' }}>{qFeedback.best_part_explanation}</p>
                               </div>
                             )}
                             {qFeedback.worst_part_quote && (
@@ -867,7 +867,7 @@ export default function FeedbackScreen() {
                                   )}
                                 </div>
                                 <p style={{ margin: 0, fontSize: '0.75rem', color: '#fca5a5', fontStyle: 'italic' }}>"{qFeedback.worst_part_quote}"</p>
-                                <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: '#9ca3af' }}>{qFeedback.worst_part_explanation}</p>
+                                <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: '#9e9e9e' }}>{qFeedback.worst_part_explanation}</p>
                               </div>
                             )}
                             {qFeedback.what_went_well && (
@@ -891,7 +891,7 @@ export default function FeedbackScreen() {
                             background: 'rgba(255,255,255,0.02)',
                             border: '1px solid rgba(255,255,255,0.06)',
                             fontSize: '0.75rem',
-                            color: '#6b6b6b',
+                            color: '#6b7280',
                             fontStyle: 'italic',
                           }}>
                             Scoring in progress...
@@ -930,7 +930,7 @@ export default function FeedbackScreen() {
                                 borderRadius: '8px',
                                 border: '1px solid rgba(255,255,255,0.1)',
                                 background: 'rgba(0,0,0,0.3)',
-                                color: '#e2e2e2',
+                                color: '#e2e8f0',
                                 fontSize: '0.75rem',
                                 outline: 'none',
                               }}
@@ -971,7 +971,7 @@ export default function FeedbackScreen() {
                               }}>
                                 {fcResult.result}
                               </div>
-                              <p style={{ margin: 0, fontSize: '0.7rem', color: '#b0b0b0' }}>
+                              <p style={{ margin: 0, fontSize: '0.7rem', color: '#b3b3b3' }}>
                                 {fcResult.explanation}
                               </p>
                             </div>
@@ -1034,19 +1034,19 @@ export default function FeedbackScreen() {
                   {overall.what_went_well && (
                     <div>
                       <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.14em', color: '#34d399', display: 'block', marginBottom: '0.2rem' }}>What Went Well</span>
-                      <p style={{ margin: 0, fontSize: '0.82rem', color: '#d6d6d6' }}>{overall.what_went_well}</p>
+                      <p style={{ margin: 0, fontSize: '0.82rem', color: '#d4d4d4' }}>{overall.what_went_well}</p>
                     </div>
                   )}
                   {overall.needs_improvement && (
                     <div>
                       <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.14em', color: '#fbbf24', display: 'block', marginBottom: '0.2rem' }}>Needs Improvement</span>
-                      <p style={{ margin: 0, fontSize: '0.82rem', color: '#d6d6d6' }}>{overall.needs_improvement}</p>
+                      <p style={{ margin: 0, fontSize: '0.82rem', color: '#d4d4d4' }}>{overall.needs_improvement}</p>
                     </div>
                   )}
                   {overall.summary && (
                     <div>
                       <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.14em', color: '#9e9e9e', display: 'block', marginBottom: '0.2rem' }}>Summary</span>
-                      <p style={{ margin: 0, fontSize: '0.82rem', color: '#d6d6d6' }}>{overall.summary}</p>
+                      <p style={{ margin: 0, fontSize: '0.82rem', color: '#d4d4d4' }}>{overall.summary}</p>
                     </div>
                   )}
                 </div>

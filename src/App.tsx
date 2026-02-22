@@ -16,7 +16,7 @@ const loadingFallback = (
     alignItems: 'center',
     justifyContent: 'center',
     background: '#09090f',
-    color: '#64748b',
+    color: '#6b7280',
     fontFamily: "'Josefin Sans', sans-serif",
     fontSize: '14px',
   }}>
