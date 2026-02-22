@@ -50,68 +50,55 @@ export function prefetchTTS(texts: string[], voice: string = 'marin', speed: num
   }
 }
 
-// --- Script Response (Pre-Interview) ---
+// --- Script Response (Pre-Interview) --- via Groq serverless
 export async function generateScriptResponse(
   systemPrompt: string,
   directive: string,
   conversationContext?: string,
 ): Promise<string> {
   const stopTimer = log.time('generateScriptResponse');
-  const openai = await getClient();
-  const messages: Array<{ role: 'system' | 'user'; content: string }> = [
-    { role: 'system', content: systemPrompt },
-  ];
-  if (conversationContext) {
-    messages.push({ role: 'user', content: `[Conversation so far]: ${conversationContext}` });
-  }
-  messages.push({ role: 'user', content: directive });
 
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    temperature: 0.8,
-    max_tokens: 150,
-    messages,
+  const response = await fetch('/api/script', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ systemPrompt, directive, conversationContext }),
   });
 
-  const text = response.choices[0]?.message?.content?.trim() ?? '';
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Script generation failed');
+  }
+
+  const data = await response.json();
+  const text = data.text ?? '';
   stopTimer();
   log.info('Script response generated', { length: text.length });
   return text;
 }
 
-// --- Voice Summary (post-interview debrief) ---
+// --- Voice Summary (post-interview debrief) --- via Groq serverless
 export async function generateVoiceSummary(feedback: import('../types').FeedbackResponse): Promise<string> {
   const stopTimer = log.time('generateVoiceSummary');
-  const openai = await getClient();
-  const { overall, questions } = feedback;
 
-  const questionSummaries = questions
-    .map((q, i) => `Q${i + 1}: score ${Math.round(q.score)}% — ${q.summary}`)
-    .join('\n');
-
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    temperature: 0.7,
-    max_tokens: 100,
-    messages: [
-      {
-        role: 'system',
-        content: `You are Starly, a friendly interview coach giving a brief spoken debrief after a practice interview. Keep it to 1-2 sentences. Mention the overall score and one quick takeaway, then encourage them to check out the guided review below. Be warm but very concise — this will be read aloud via TTS.`,
-      },
-      {
-        role: 'user',
-        content: `Overall score: ${Math.round(overall.score)}%\nStrengths: ${overall.what_went_well}\nAreas to improve: ${overall.needs_improvement}\n\nPer-question summaries:\n${questionSummaries}`,
-      },
-    ],
+  const response = await fetch('/api/voice-summary', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ overall: feedback.overall, questions: feedback.questions }),
   });
 
-  const text = response.choices[0]?.message?.content?.trim() ?? '';
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Voice summary failed');
+  }
+
+  const data = await response.json();
+  const text = data.text ?? '';
   stopTimer();
   log.info('Voice summary generated', { length: text.length });
   return text;
 }
 
-// --- Pause Analysis ---
+// --- Pause Analysis --- via Groq serverless
 // Returns:
 //   'definitely_done'          — auto-submit the answer (extremely high confidence)
 //   'definitely_still_talking' — stay silent, don't interrupt (extremely high confidence)
@@ -119,54 +106,20 @@ export async function generateVoiceSummary(feedback: import('../types').Feedback
 export async function analyzePause(transcript: string): Promise<'definitely_done' | 'definitely_still_talking' | 'ask'> {
   const stopTimer = log.time('analyzePause');
   log.info('analyzePause called', { transcriptLength: transcript.length });
-  const openai = await getClient();
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    temperature: 0,
-    max_tokens: 20,
-    messages: [
-      {
-        role: 'system',
-        content: `You analyze an interview candidate's transcript after they paused for several seconds. Decide what to do next. Be decisive — avoid "ask" unless truly necessary.
 
-Return "definitely_done" if you are >=60% confident the candidate has finished. This includes:
-- The candidate explicitly signals they are finished (e.g. "I'm done", "that's it", "that's all", "that's my answer", "yeah that's about it", "I think that covers it")
-- The answer has a concluding statement (wrapping up with a result, lesson learned, or summary) AND covers reasonable ground (30+ words)
-- The candidate has addressed the question and their last sentence feels like a natural stopping point
-- The transcript trails off after making a complete point, even without an explicit wrap-up
-- The answer is 50+ words and the last sentence is a complete thought
-
-Return "definitely_still_talking" ONLY if you are very confident the candidate is mid-thought:
-- The transcript ends mid-sentence with an incomplete clause
-- The last word is a conjunction or preposition (and, but, so, because, like, with, to, for, that, which)
-- The transcript is very short (under 15 words) and clearly just getting started
-
-Return "ask" ONLY as a last resort when you genuinely cannot decide. Strongly prefer "definitely_done" over "ask" — a pause of several seconds after a reasonable answer almost always means they're done.`,
-      },
-      {
-        role: 'user',
-        content: `Transcript so far: "${transcript}"`,
-      },
-    ],
-    response_format: {
-      type: 'json_schema',
-      json_schema: {
-        name: 'pause_analysis',
-        strict: true,
-        schema: {
-          type: 'object' as const,
-          properties: {
-            verdict: { type: 'string' as const, enum: ['definitely_done', 'definitely_still_talking', 'ask'] },
-          },
-          required: ['verdict'],
-          additionalProperties: false,
-        },
-      },
-    },
+  const response = await fetch('/api/pause', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ transcript }),
   });
 
-  const parsed = JSON.parse(response.choices[0]?.message?.content ?? '{}');
-  const verdict = parsed.verdict;
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Pause analysis failed');
+  }
+
+  const data = await response.json();
+  const verdict = data.verdict;
   stopTimer();
   log.info('analyzePause verdict', { verdict });
   if (verdict === 'definitely_done') return 'definitely_done';
