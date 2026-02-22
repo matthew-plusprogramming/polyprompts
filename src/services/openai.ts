@@ -18,8 +18,8 @@ async function getClient() {
 // --- TTS ---
 const ttsCache = new Map<string, Blob>();
 
-export async function textToSpeech(text: string, voice: string = 'marin', speed: number = 1.0): Promise<Blob> {
-  const cacheKey = voice + ':' + speed + ':' + text;
+export async function textToSpeech(text: string, voice: string = 'marin', speed: number = 1.0, instructions?: string): Promise<Blob> {
+  const cacheKey = voice + ':' + speed + ':' + (instructions ?? '') + ':' + text;
   const cached = ttsCache.get(cacheKey);
   if (cached) {
     log.debug('TTS cache hit', { voice, speed });
@@ -31,6 +31,7 @@ export async function textToSpeech(text: string, voice: string = 'marin', speed:
     model: 'gpt-4o-mini-tts',
     voice: voice as 'alloy' | 'nova' | 'shimmer' | 'echo' | 'onyx' | 'fable' | 'marin',
     input: text,
+    instructions: instructions ?? 'Speak warmly and conversationally, like a friendly interview coach encouraging the candidate. Be natural, clear, and supportive.',
     response_format: 'mp3',
     speed: Math.max(0.25, Math.min(4.0, speed)), // OpenAI TTS supports 0.25-4.0
   });
@@ -41,9 +42,9 @@ export async function textToSpeech(text: string, voice: string = 'marin', speed:
 }
 
 // --- TTS Prefetch ---
-export function prefetchTTS(texts: string[], voice: string = 'marin', speed: number = 1.0): void {
+export function prefetchTTS(texts: string[], voice: string = 'marin', speed: number = 1.0, instructions?: string): void {
   for (const text of texts) {
-    textToSpeech(text, voice, speed).catch((err) => {
+    textToSpeech(text, voice, speed, instructions).catch((err) => {
       log.warn('TTS prefetch failed', { text: text.slice(0, 40), error: String(err) });
     });
   }
