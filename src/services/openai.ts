@@ -49,6 +49,35 @@ export function prefetchTTS(texts: string[], voice: string = 'alloy', speed: num
   }
 }
 
+// --- Script Response (Pre-Interview) ---
+export async function generateScriptResponse(
+  systemPrompt: string,
+  directive: string,
+  conversationContext?: string,
+): Promise<string> {
+  const stopTimer = log.time('generateScriptResponse');
+  const openai = await getClient();
+  const messages: Array<{ role: 'system' | 'user'; content: string }> = [
+    { role: 'system', content: systemPrompt },
+  ];
+  if (conversationContext) {
+    messages.push({ role: 'user', content: `[Conversation so far]: ${conversationContext}` });
+  }
+  messages.push({ role: 'user', content: directive });
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    temperature: 0.8,
+    max_tokens: 150,
+    messages,
+  });
+
+  const text = response.choices[0]?.message?.content?.trim() ?? '';
+  stopTimer();
+  log.info('Script response generated', { length: text.length });
+  return text;
+}
+
 // --- Pause Analysis ---
 // Returns:
 //   'definitely_done'          — auto-submit the answer (extremely high confidence)
