@@ -51,7 +51,7 @@ export default function PreInterviewScreen() {
 
   // Prefetch TTS for all hardcoded responses on mount
   useEffect(() => {
-    prefetchTTS(getPreInterviewPrefetchTexts(script));
+    prefetchTTS(getPreInterviewPrefetchTexts(script), 'marin', 1.0);
   }, []);
 
   // Initialize mic + Deepgram
