@@ -39,8 +39,9 @@ ${prevList}${nameInstruction}
 This is question number ${questionNumber || 1}.
 
 Generate ONE behavioral interview question. The question should:
-- START with a brief company/role context from the job description using "At our company" (do NOT invent a company name). Example: "At our company, we work closely with cross-functional teams — tell me about a time when..."
-- Keep the company context lead-in under 15 words, then transition to the behavioral question
+- START by briefly describing what the company/role does based on the job description, then ask about the candidate's relevant experience. Example: "At our company, we build scalable data pipelines for real-time analytics — tell me about a time when you worked on something similar." or "In this role, you'd be leading cross-functional design sprints — what experience do you have facilitating collaborative workshops?"
+- The company context should describe what they actually DO (from the JD), not just say "at our company" generically — give enough context so the candidate understands the work, then ask about their related experience
+- Keep the company context lead-in under 25 words, then transition to the behavioral question
 - Be relevant to the skills, responsibilities, or values mentioned in the job description
 - Follow a behavioral format (e.g. "Tell me about a time when..." or "How did you handle...")
 - Be challenging but fair

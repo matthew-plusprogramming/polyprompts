@@ -254,6 +254,17 @@ export default function FeedbackScreen() {
     });
   }, [state.voiceSummary, feedbackResponse, guidedPhase, speak, state.ttsVoice, state.ttsSpeed]);
 
+  // Escape key stops guided review
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && guidedPhase !== 'idle') {
+        cancelGuidedReview();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [guidedPhase, cancelGuidedReview]);
+
   // Cleanup guided review on unmount
   useEffect(() => {
     return () => {
@@ -566,7 +577,13 @@ export default function FeedbackScreen() {
                   {hasResult ? "Composite score" : "Awaiting scoring"}
                 </em>
                 {hasResult && overall?.confidence_score != null && (
-                  <span style={{ fontSize: '0.6rem', color: '#6b7280', marginTop: '2px', display: 'block' }}>
+                  <span style={{
+                    fontSize: '0.75rem',
+                    color: '#b3b3b3',
+                    marginTop: '0.25rem',
+                    display: 'block',
+                    letterSpacing: '0.1em',
+                  }}>
                     {Math.round(overall.confidence_score)}% confidence
                   </span>
                 )}
