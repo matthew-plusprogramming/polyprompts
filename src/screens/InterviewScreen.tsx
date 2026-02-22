@@ -1352,60 +1352,61 @@ export default function InterviewScreen() {
               text={state.currentQuestion?.text ?? ''}
               isTyping={phase === 'speaking-question'}
               isComplete={phase !== 'speaking-question' && phase !== 'ready'}
-              visible={phase === 'speaking-question' || phase === 'thinking' || phase === 'recording' || phase === 'silence-detected' || phase === 'asking-done'}
+              visible={phase === 'ready' || phase === 'speaking-question' || phase === 'thinking' || phase === 'recording' || phase === 'silence-detected' || phase === 'asking-done'}
               ttsSpeed={state.ttsSpeed}
             />
           </div>
 
-          {/* Status banner — always in the DOM to prevent layout shift */}
-          <div
-            style={{
-              position: 'relative',
-              zIndex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-              padding: '8px 24px',
-              marginBottom: '0.25rem',
-              borderRadius: '14px',
-              background: phase === 'transitioning'
-                ? 'rgba(167,139,250,0.07)'
-                : 'rgba(129,140,248,0.07)',
-              border: phase === 'transitioning'
-                ? '1px solid rgba(167,139,250,0.18)'
-                : '1px solid rgba(129,140,248,0.18)',
-              animation: phase === 'thinking' ? 'breathing 2s ease-in-out infinite' : 'none',
-              opacity: phase === 'thinking' || phase === 'transitioning' ? 1 : 0,
-              visibility: phase === 'thinking' || phase === 'transitioning' ? 'visible' as const : 'hidden' as const,
-              transition: 'opacity 0.3s ease, visibility 0.3s ease',
-            }}
-          >
-            <div
-              style={{
-                width: '7px',
-                height: '7px',
-                borderRadius: '50%',
-                background: phase === 'transitioning' ? '#a78bfa' : '#818cf8',
-                flexShrink: 0,
-                opacity: 0.8,
-                animation: phase === 'transitioning' ? 'pulse-ring 1.2s ease-out infinite' : 'none',
-              }}
-            />
-            <span
-              style={{
-                fontFamily: "'Space Grotesk', sans-serif",
-                fontSize: '13px',
-                fontWeight: '600',
-                color: phase === 'transitioning' ? '#c4b5fd' : '#a5b4fc',
-                letterSpacing: '0.01em',
-              }}
-            >
-              {phase === 'transitioning'
-                ? <>Moving to the next question&hellip;</>
-                : <>Take a moment to collect your thoughts&hellip;</>}
-            </span>
-          </div>
+          {/* Status banner — container always visible for stable layout, content fades */}
+          {(() => {
+            const active = phase === 'thinking' || phase === 'transitioning';
+            return (
+              <div
+                style={{
+                  position: 'relative',
+                  zIndex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  padding: '8px 24px',
+                  marginBottom: '0.25rem',
+                  borderRadius: '14px',
+                  background: 'transparent',
+                  border: '1px solid transparent',
+                  animation: phase === 'thinking' ? 'breathing 2s ease-in-out infinite' : 'none',
+                }}
+              >
+                <div
+                  style={{
+                    width: '7px',
+                    height: '7px',
+                    borderRadius: '50%',
+                    background: phase === 'transitioning' ? '#a78bfa' : '#818cf8',
+                    flexShrink: 0,
+                    opacity: active ? 0.8 : 0,
+                    transition: 'opacity 0.3s ease',
+                    animation: phase === 'transitioning' ? 'pulse-ring 1.2s ease-out infinite' : 'none',
+                  }}
+                />
+                <span
+                  style={{
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: phase === 'transitioning' ? '#c4b5fd' : '#a5b4fc',
+                    letterSpacing: '0.01em',
+                    opacity: active ? 1 : 0,
+                    transition: 'opacity 0.3s ease',
+                  }}
+                >
+                  {phase === 'transitioning'
+                    ? <>Moving to the next question&hellip;</>
+                    : <>Take a moment to collect your thoughts&hellip;</>}
+                </span>
+              </div>
+            );
+          })()}
 
           {/* Mic error panel */}
           {phase === 'mic-error' && (
