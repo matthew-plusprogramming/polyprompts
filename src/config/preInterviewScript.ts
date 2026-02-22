@@ -11,7 +11,6 @@ export interface ScriptStep {
 export interface PreInterviewScript {
   systemPrompt: string;
   steps: ScriptStep[];
-  completionMessage: string;
 }
 
 export const defaultScript: PreInterviewScript = {
@@ -33,8 +32,6 @@ export const defaultScript: PreInterviewScript = {
         "Love the energy! I'll ask you a couple behavioral questions — just use the STAR framework: Situation, Task, Action, Result. Take your time, there's no rush. Let's do this!",
     },
   ],
-
-  completionMessage: "Alright, showtime! Let's begin your interview. You've got this!",
 };
 
 /** Collect all hardcoded response strings for TTS prefetching */
@@ -43,6 +40,5 @@ export function getPreInterviewPrefetchTexts(script: PreInterviewScript = defaul
   for (const step of script.steps) {
     if (step.response) texts.push(step.response);
   }
-  texts.push(script.completionMessage);
   return texts;
 }
