@@ -1484,7 +1484,7 @@ export default function InterviewScreen() {
                     willChange: 'transform, filter, opacity',
                     transition: 'opacity 160ms linear, filter 180ms linear',
                     animation: 'starlyFlow 7.2s linear infinite, starlyGlow 1.8s ease-in-out infinite',
-                    animationPlayState: visualizerSpeaking ? 'running' : 'paused',
+                    animationPlayState: visualizerSpeaking && phase !== 'recording' ? 'running' : 'paused',
                     animationFillMode: 'both',
                   }}
                 />
