@@ -1439,7 +1439,7 @@ export default function InterviewScreen() {
 
           {/* Status banner — container always visible for stable layout, content fades */}
           {(() => {
-            const active = phase === 'thinking' || phase === 'transitioning';
+            const active = phase === 'thinking';
             return (
               <div
                 style={{
