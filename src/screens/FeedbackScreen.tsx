@@ -565,6 +565,11 @@ export default function FeedbackScreen() {
                 <em>
                   {hasResult ? "Composite score" : "Awaiting scoring"}
                 </em>
+                {hasResult && overall?.confidence_score != null && (
+                  <span style={{ fontSize: '0.6rem', color: '#6b6b6b', marginTop: '2px', display: 'block' }}>
+                    {Math.round(overall.confidence_score)}% confidence
+                  </span>
+                )}
               </div>
             </div>
 
