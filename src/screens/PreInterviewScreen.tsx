@@ -13,7 +13,7 @@ import { createLogger } from '../utils/logger';
 
 const log = createLogger('PreInterview');
 
-type Phase = 'initializing' | 'listening' | 'responding' | 'completing';
+type Phase = 'initializing' | 'listening' | 'responding';
 
 export default function PreInterviewScreen() {
   const { state } = useInterview();
@@ -135,14 +135,7 @@ export default function PreInterviewScreen() {
       // Move to next step or complete
       const nextIndex = currentStepIndex + 1;
       if (nextIndex >= script.steps.length) {
-        // All steps done — play completion message
-        setPhase('completing');
-        try {
-          await speak(script.completionMessage, { onStart: () => setSubtitle(script.completionMessage) });
-        } catch (err) {
-          log.warn('Completion TTS failed', { error: String(err) });
-          setSubtitle(script.completionMessage);
-        }
+        // All steps done — go straight to interview
         navigate('/interview', { replace: true, state: { autoStart: true } });
       } else {
         setStepIndex(nextIndex);
