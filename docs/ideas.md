@@ -2,3 +2,4 @@
 - Info page
 - Job desc page
 - Generate role in the upper right based on job description
+- We're ready
