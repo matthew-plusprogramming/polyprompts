@@ -274,7 +274,17 @@ export default function PreInterviewScreen() {
         <img
           src={starlyIcon}
           alt="Starly"
-          style={{ height: '80px', width: 'auto', objectFit: 'contain' }}
+          style={{
+            height: '80px',
+            width: 'auto',
+            objectFit: 'contain',
+            opacity: ttsPlaying ? 1 : 0.55,
+            filter: ttsPlaying
+              ? 'brightness(1.25) drop-shadow(0 0 8px rgba(255,255,255,0.5))'
+              : 'brightness(0.7)',
+            transform: ttsPlaying ? 'scale(1.12)' : 'scale(1)',
+            transition: 'opacity 0.4s ease, filter 0.4s ease, transform 0.4s ease',
+          }}
         />
       </div>
 
