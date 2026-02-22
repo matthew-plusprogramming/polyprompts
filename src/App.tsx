@@ -1,7 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { InterviewProvider } from './context/InterviewContext';
-import HomeScreen from './screens/HomeScreen';
 import JobDescription from './screens/JobDescription';
 
 const InfoPage = lazy(() => import('./screens/InfoPage'));
