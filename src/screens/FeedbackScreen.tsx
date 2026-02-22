@@ -11,6 +11,8 @@ import { createLogger } from "../utils/logger";
 
 const log = createLogger("Feedback");
 
+const FEEDBACK_TTS_INSTRUCTIONS = 'Calm, measured delivery. Speak like a thoughtful coach giving a one-on-one debrief — unhurried, direct, matter-of-fact. Pause briefly before key advice. No cheerfulness or hype.';
+
 const dimensions = [
   { key: "response_organization", label: "Organization" },
   { key: "technical_knowledge", label: "Technical" },
@@ -185,12 +187,12 @@ export default function FeedbackScreen() {
       if (q.worst_part_explanation) allTexts.push(q.worst_part_explanation);
     }
     allTexts.push(outroText);
-    prefetchTTS(allTexts, ttsVoice, guidedSpeed);
+    prefetchTTS(allTexts, ttsVoice, guidedSpeed, FEEDBACK_TTS_INSTRUCTIONS);
 
     // Intro
     setGuidedPhase('intro');
     setGuidedQuestionIdx(-1);
-    try { await speak(introText, ttsVoice, guidedSpeed); } catch { /* interrupted */ }
+    try { await speak(introText, { voice: ttsVoice, speed: guidedSpeed, instructions: FEEDBACK_TTS_INSTRUCTIONS }); } catch { /* interrupted */ }
     if (guidedCancelledRef.current) return;
 
     // Per-question loop
@@ -212,7 +214,7 @@ export default function FeedbackScreen() {
         if (guidedCancelledRef.current) return;
 
         setGuidedPhase('narrate-best');
-        try { await speak(qFeedback.best_part_explanation, ttsVoice, guidedSpeed); } catch { /* interrupted */ }
+        try { await speak(qFeedback.best_part_explanation, { voice: ttsVoice, speed: guidedSpeed, instructions: FEEDBACK_TTS_INSTRUCTIONS }); } catch { /* interrupted */ }
         if (guidedCancelledRef.current) return;
       }
 
@@ -223,7 +225,7 @@ export default function FeedbackScreen() {
         if (guidedCancelledRef.current) return;
 
         setGuidedPhase('narrate-worst');
-        try { await speak(qFeedback.worst_part_explanation, ttsVoice, guidedSpeed); } catch { /* interrupted */ }
+        try { await speak(qFeedback.worst_part_explanation, { voice: ttsVoice, speed: guidedSpeed, instructions: FEEDBACK_TTS_INSTRUCTIONS }); } catch { /* interrupted */ }
         if (guidedCancelledRef.current) return;
       }
     }
@@ -232,7 +234,7 @@ export default function FeedbackScreen() {
     if (guidedCancelledRef.current) return;
     setGuidedPhase('outro');
     setGuidedQuestionIdx(-1);
-    try { await speak(outroText, ttsVoice, guidedSpeed); } catch { /* interrupted */ }
+    try { await speak(outroText, { voice: ttsVoice, speed: guidedSpeed, instructions: FEEDBACK_TTS_INSTRUCTIONS }); } catch { /* interrupted */ }
 
     setGuidedPhase('idle');
     setGuidedQuestionIdx(0);
@@ -248,7 +250,7 @@ export default function FeedbackScreen() {
 
     hasPlayedSummaryRef.current = true;
     log.info('Auto-playing voice summary');
-    speak(state.voiceSummary, state.ttsVoice, state.ttsSpeed).catch((err) => {
+    speak(state.voiceSummary, { voice: state.ttsVoice, speed: state.ttsSpeed, instructions: FEEDBACK_TTS_INSTRUCTIONS }).catch((err) => {
       log.warn('Voice summary playback failed', { error: String(err) });
     });
   }, [state.voiceSummary, feedbackResponse, guidedPhase, speak, state.ttsVoice, state.ttsSpeed]);
@@ -346,7 +348,7 @@ export default function FeedbackScreen() {
     }
     allTexts.push(outroText);
     log.info('Prefetching guided review TTS', { textCount: allTexts.length });
-    prefetchTTS(allTexts, state.ttsVoice, guidedSpeed);
+    prefetchTTS(allTexts, state.ttsVoice, guidedSpeed, FEEDBACK_TTS_INSTRUCTIONS);
   }, [feedbackResponse, state.ttsSpeed, state.ttsVoice]);
 
   const getDimensionValue = (key: DimensionKey): number => {
