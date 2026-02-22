@@ -6,6 +6,6 @@
   "devCommand": "npm run dev",
   "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/" }
+    { "source": "/((?!api/|assets/).*)", "destination": "/" }
   ]
 }

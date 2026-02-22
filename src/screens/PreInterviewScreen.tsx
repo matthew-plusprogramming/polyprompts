@@ -365,8 +365,8 @@ export default function PreInterviewScreen() {
               alignItems: 'center',
               gap: '10px',
               padding: '8px 20px',
-              background: 'rgba(34,211,238,0.06)',
-              border: '1px solid rgba(34,211,238,0.18)',
+              background: 'rgba(163,230,53,0.06)',
+              border: '1px solid rgba(163,230,53,0.18)',
               borderRadius: '999px',
             }}
           >
@@ -376,7 +376,7 @@ export default function PreInterviewScreen() {
                   position: 'absolute',
                   inset: 0,
                   borderRadius: '50%',
-                  background: '#22d3ee',
+                  background: '#a3e635',
                   animation: 'pulse-ring 1.6s ease-out infinite',
                 }}
               />
@@ -385,7 +385,7 @@ export default function PreInterviewScreen() {
                   position: 'absolute',
                   inset: 0,
                   borderRadius: '50%',
-                  background: '#22d3ee',
+                  background: '#a3e635',
                 }}
               />
             </div>
@@ -394,7 +394,7 @@ export default function PreInterviewScreen() {
                 fontFamily: "'Josefin Sans', sans-serif",
                 fontSize: '12px',
                 fontWeight: '600',
-                color: '#22d3ee',
+                color: '#a3e635',
                 letterSpacing: '0.1em',
               }}
             >

@@ -108,37 +108,21 @@ export default function TypewriterQuestion({
       {/* Label */}
       <div
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
           marginBottom: '10px',
+          padding: '0 0.7rem',
         }}
       >
-        <div
-          style={{
-            width: '6px',
-            height: '6px',
-            borderRadius: '50%',
-            background: '#f5f5f5',
-            flexShrink: 0,
-            animation: isTyping ? 'pulse-ring 1.4s ease-out infinite' : 'none',
-            opacity: isTyping ? 1 : 0.4,
-            transition: 'opacity 0.3s ease',
-          }}
-        />
-        <span
+        <strong
           style={{
             fontFamily: "'Josefin Sans', sans-serif",
-            fontSize: '10px',
-            fontWeight: '700',
-            letterSpacing: '0.12em',
+            fontSize: '0.85rem',
+            letterSpacing: '0.14em',
             textTransform: 'uppercase',
-            color: isTyping ? '#cbff70' : '#9ca3af',
-            transition: 'color 0.3s ease',
+            color: '#ececec',
           }}
         >
           Interview Question
-        </span>
+        </strong>
       </div>
 
       {/* Question text with typewriter effect */}
