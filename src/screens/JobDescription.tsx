@@ -150,9 +150,8 @@ export default function JobDescription() {
         role: state.role,
         difficulty: state.difficulty,
         count: 2,
-        ...(resumeText
-          ? { resumeText, jobDescription: trimmed }
-          : {}),
+        jobDescription: trimmed,
+        ...(resumeText ? { resumeText } : {}),
       });
 
       if (!generatedQuestions.length) {
