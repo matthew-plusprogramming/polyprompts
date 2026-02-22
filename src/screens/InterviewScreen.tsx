@@ -832,14 +832,14 @@ export default function InterviewScreen() {
   };
 
   const phaseBadgeColor: Record<ScreenPhase, string> = {
-    ready: '#6366f1',
-    'speaking-question': '#a78bfa',
-    thinking: '#818cf8',
-    recording: '#22d3ee',
-    'silence-detected': '#f59e0b',
-    'asking-done': '#34d399',
+    ready: '#9ca3af',
+    'speaking-question': '#f5f5f5',
+    thinking: '#d1d5db',
+    recording: '#cbff70',
+    'silence-detected': '#e5e7eb',
+    'asking-done': '#cbff70',
     'mic-error': '#f87171',
-    transitioning: '#a78bfa',
+    transitioning: '#f5f5f5',
     finished: '#6b7280',
   };
 
@@ -860,7 +860,7 @@ export default function InterviewScreen() {
         display: 'flex',
         flexDirection: 'column',
         borderRadius: '26px',
-        border: '1px solid rgba(255, 255, 255, 0.14)',
+        border: '1px solid #2a2a2a',
         color: '#eef8ff',
         backgroundColor: '#050a14',
         background:
@@ -890,13 +890,36 @@ export default function InterviewScreen() {
           .transcript-scroll::-webkit-scrollbar-thumb:hover {
             background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(228, 228, 228, 0.9) 50%, rgba(182, 182, 182, 0.9));
           }
-          @keyframes floatBlobA {
-            0%, 100% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(-14px) rotate(8deg); }
+          @keyframes starTwinkle {
+            0% { opacity: 0.2; transform: translateY(0); }
+            40% { opacity: 0.42; }
+            70% { opacity: 0.28; transform: translateY(6px); }
+            100% { opacity: 0.22; transform: translateY(0); }
           }
-          @keyframes floatBlobB {
-            0%, 100% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(12px) rotate(-10deg); }
+          .interview-stars {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            background-image: radial-gradient(2.4px 2.4px at 18px 24px, rgba(255, 255, 255, 0.95), transparent 70%),
+              radial-gradient(1.6px 1.6px at 62px 96px, rgba(255, 255, 255, 0.85), transparent 70%),
+              radial-gradient(2px 2px at 120px 44px, rgba(255, 255, 255, 0.9), transparent 70%),
+              radial-gradient(1.4px 1.4px at 176px 120px, rgba(255, 255, 255, 0.75), transparent 70%),
+              radial-gradient(2.8px 2.8px at 216px 34px, rgba(255, 255, 255, 0.95), transparent 70%),
+              radial-gradient(1.8px 1.8px at 260px 168px, rgba(255, 255, 255, 0.85), transparent 70%),
+              radial-gradient(1.6px 1.6px at 310px 78px, rgba(255, 255, 255, 0.8), transparent 70%),
+              radial-gradient(2.2px 2.2px at 356px 210px, rgba(255, 255, 255, 0.9), transparent 70%),
+              radial-gradient(1.6px 1.6px at 402px 144px, rgba(255, 255, 255, 0.8), transparent 70%);
+            background-size: 200px 150px;
+            opacity: 0.4;
+            filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.4));
+            animation: starTwinkle 3s ease-in-out infinite;
+          }
+          .interview-stars--layer2 {
+            background-size: 300px 230px;
+            opacity: 0.24;
+            animation-duration: 7s;
+            animation-delay: -2.2s;
           }
           @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
           @keyframes pulse-ring {
@@ -948,34 +971,9 @@ export default function InterviewScreen() {
         `}
       </style>
 
-      {/* ── Floating blob decorations (main's design) ── */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '-80px',
-          right: '-90px',
-          width: '280px',
-          height: '280px',
-          borderRadius: '34% 66% 61% 39% / 37% 43% 57% 63%',
-          background: 'radial-gradient(circle, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0))',
-          pointerEvents: 'none',
-          filter: 'blur(1px)',
-          animation: 'floatBlobA 7s ease-in-out infinite',
-        }}
-      />
-      <div
-        style={{
-          position: 'absolute',
-          bottom: '-100px',
-          left: '-80px',
-          width: '300px',
-          height: '300px',
-          borderRadius: '56% 44% 30% 70% / 41% 52% 48% 59%',
-          background: 'radial-gradient(circle, rgba(210, 210, 210, 0.2), rgba(210, 210, 210, 0))',
-          pointerEvents: 'none',
-          animation: 'floatBlobB 8s ease-in-out infinite',
-        }}
-      />
+      {/* ── Star field decorations ── */}
+      <div className="interview-stars" />
+      <div className="interview-stars interview-stars--layer2" />
 
       {/* ── Header: Starly logo, timer, Settings + End/Start ── */}
       <header
@@ -998,6 +996,12 @@ export default function InterviewScreen() {
               width: 'auto',
               objectFit: 'contain',
               marginLeft: '0.25rem',
+              opacity: ttsPlaying ? 1 : 0.55,
+              filter: ttsPlaying
+                ? 'brightness(1.25) drop-shadow(0 0 8px rgba(255,255,255,0.5))'
+                : 'brightness(0.7)',
+              transform: ttsPlaying ? 'scale(1.12)' : 'scale(1)',
+              transition: 'opacity 0.4s ease, filter 0.4s ease, transform 0.4s ease',
             }}
           />
           {/* Phase badge */}
@@ -1050,14 +1054,14 @@ export default function InterviewScreen() {
             <div
               style={{
                 padding: '4px 10px',
-                background: 'rgba(99,102,241,0.1)',
-                border: '1px solid rgba(99,102,241,0.25)',
+                background: '#141414',
+                border: '1px solid #2a2a2a',
                 borderRadius: '999px',
                 fontFamily: "'Josefin Sans', sans-serif",
                 fontSize: '11px',
                 fontWeight: '600',
                 letterSpacing: '0.06em',
-                color: '#a5b4fc',
+                color: '#f3f4f6',
               }}
             >
               {questionLabel}
@@ -1095,14 +1099,14 @@ export default function InterviewScreen() {
                 borderRadius: '12px',
                 border: 'none',
                 background: state.currentQuestion
-                  ? 'linear-gradient(135deg, #4338ca, #6366f1 50%, #22d3ee)'
+                  ? 'linear-gradient(135deg, #ffffff, #e6e6e6 55%, #cfcfcf)'
                   : '#111120',
-                color: '#fff',
+                color: '#0b0b0b',
                 fontSize: '0.9rem',
                 fontWeight: 700,
                 letterSpacing: '0.08em',
                 boxShadow: state.currentQuestion
-                  ? '0 6px 28px rgba(99,102,241,0.42), 0 0 0 1px rgba(99,102,241,0.2)'
+                  ? '0 0 18px rgba(255,255,255,0.28), 0 0 0 1px rgba(255,255,255,0.22)'
                   : 'none',
                 cursor: state.currentQuestion ? 'pointer' : 'not-allowed',
                 display: 'flex',
@@ -1178,8 +1182,8 @@ export default function InterviewScreen() {
                 position: 'absolute',
                 inset: 0,
                 borderRadius: '50%',
-                border: '3px solid rgba(99,102,241,0.12)',
-                borderTopColor: '#6366f1',
+                border: '3px solid rgba(255,255,255,0.14)',
+                borderTopColor: '#f5f5f5',
                 animation: 'spin 0.8s linear infinite',
               }}
             />
@@ -1188,8 +1192,8 @@ export default function InterviewScreen() {
                 position: 'absolute',
                 inset: '6px',
                 borderRadius: '50%',
-                border: '3px solid rgba(34,211,238,0.1)',
-                borderBottomColor: '#22d3ee',
+                border: '3px solid rgba(255,255,255,0.08)',
+                borderBottomColor: '#d4d4d4',
                 animation: 'spin 1.2s linear infinite reverse',
               }}
             />
@@ -1236,10 +1240,10 @@ export default function InterviewScreen() {
                       height: '10px',
                       borderRadius: '50%',
                       background: scored
-                        ? '#22d3ee'
-                        : 'rgba(99,102,241,0.25)',
+                        ? '#f5f5f5'
+                        : 'rgba(255,255,255,0.2)',
                       boxShadow: scored
-                        ? '0 0 8px rgba(34,211,238,0.5)'
+                        ? '0 0 8px rgba(255,255,255,0.4)'
                         : 'none',
                       transition: 'all 0.3s ease',
                     }}
@@ -1273,7 +1277,7 @@ export default function InterviewScreen() {
                 minHeight: 0,
                 height: '100%',
                 boxSizing: 'border-box',
-                border: '1px solid rgba(255, 255, 255, 0.14)',
+                border: '1px solid #2a2a2a',
                 borderRadius: '22px 10px 22px 10px',
                 overflow: 'hidden',
                 background: 'linear-gradient(165deg, rgba(10, 20, 37, 0.88), rgba(6, 12, 23, 0.95))',
@@ -1435,7 +1439,7 @@ export default function InterviewScreen() {
                 minHeight: 0,
                 height: '100%',
                 boxSizing: 'border-box',
-                border: '1px solid rgba(255, 255, 255, 0.14)',
+                border: '1px solid #2a2a2a',
                 borderRadius: '10px 22px 10px 22px',
                 background: 'linear-gradient(160deg, rgba(12, 22, 34, 0.95), rgba(8, 16, 27, 0.98))',
                 color: '#f0f0f0',
@@ -1507,8 +1511,8 @@ export default function InterviewScreen() {
                   maxHeight: active ? '40px' : '0px',
                   overflow: 'hidden',
                   borderRadius: '14px',
-                  background: 'rgba(99,102,241,0.06)',
-                  border: active ? '1px solid rgba(99,102,241,0.16)' : '1px solid transparent',
+                  background: '#141414',
+                  border: active ? '1px solid #2a2a2a' : '1px solid transparent',
                   animation: phase === 'thinking' ? 'breathing 2s ease-in-out infinite' : 'none',
                   transition: 'max-height 0.3s ease, padding 0.3s ease, border-color 0.3s ease',
                 }}
@@ -1518,7 +1522,7 @@ export default function InterviewScreen() {
                     width: '7px',
                     height: '7px',
                     borderRadius: '50%',
-                    background: phase === 'transitioning' ? '#a78bfa' : '#818cf8',
+                    background: phase === 'transitioning' ? '#f5f5f5' : '#cbff70',
                     flexShrink: 0,
                     opacity: active ? 0.8 : 0,
                     transition: 'opacity 0.3s ease',
@@ -1530,7 +1534,7 @@ export default function InterviewScreen() {
                     fontFamily: "'Josefin Sans', sans-serif",
                     fontSize: '13px',
                     fontWeight: '600',
-                    color: phase === 'transitioning' ? '#c4b5fd' : '#a5b4fc',
+                    color: phase === 'transitioning' ? '#f5f5f5' : '#d9f99d',
                     letterSpacing: '0.01em',
                     opacity: active ? 1 : 0,
                     transition: 'opacity 0.3s ease',
@@ -1575,9 +1579,9 @@ export default function InterviewScreen() {
                   style={{
                     padding: '10px 24px',
                     borderRadius: '10px',
-                    border: '1px solid rgba(99,102,241,0.4)',
-                    background: 'rgba(99,102,241,0.15)',
-                    color: '#a5b4fc',
+                    border: '1px solid #2a2a2a',
+                    background: 'rgba(255,255,255,0.08)',
+                    color: '#f3f4f6',
                     fontSize: '14px',
                     fontWeight: '700',
                     cursor: state.currentQuestion ? 'pointer' : 'not-allowed',
@@ -1619,7 +1623,7 @@ export default function InterviewScreen() {
               flex: '0 0 240px',
               minHeight: 0,
               padding: '0.65rem 1.1rem 1.1rem',
-              border: '1px solid rgba(255, 255, 255, 0.14)',
+              border: '1px solid #2a2a2a',
               borderRadius: '22px',
               background: 'linear-gradient(165deg, rgba(10, 19, 31, 0.94), rgba(6, 13, 23, 0.98))',
               color: '#ecfffb',
