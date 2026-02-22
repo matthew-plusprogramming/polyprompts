@@ -1255,12 +1255,13 @@ export default function SetupScreen() {
         }
         textsToCache.push("Are you finished, or would you like to keep going?");
         prefetchTTS(textsToCache, 'marin', 1.0, INTERVIEW_TTS_INSTRUCTIONS);
+        // Prefetch pre-interview script TTS alongside question TTS
+        prefetchTTS(getPreInterviewPrefetchTexts(), 'marin', 1.0);
+        navigate('/pre-interview');
       } else {
         log.warn('No questions matched filters', { role: mappedRole, difficulty, category });
+        setLaunching(false);
       }
-      // Prefetch pre-interview script TTS alongside question TTS
-      prefetchTTS(getPreInterviewPrefetchTexts(), 'marin', 1.0);
-      navigate('/pre-interview');
     } catch (err) {
       console.error('[SetupScreen] Failed to load questions:', err);
       setLaunching(false);

@@ -75,10 +75,12 @@ Generate a NEW question that is different from the previous ones.`,
     const data = await response.json();
     let question = (data.choices?.[0]?.message?.content ?? "").trim();
 
-    // Cleanup safety
+    // Cleanup: strip known LLM preamble patterns, quotes, numbering, and trailing meta-commentary
     question = question
-      .replace(/^.*?:\s*/, "")
-      .replace(/["]/g, "")
+      .replace(/^(?:sure[!.]?\s*|of course[!.]?\s*|here(?:'s| is)(?: a| your| the)? (?:question|one)[^:\n]*[:]\s*|question\s*[:]\s*|\*{1,2}question\*{0,2}\s*[:]\s*)/i, "")
+      .replace(/^\d+\.\s*/, "")
+      .replace(/^["]+|["]+$/g, "")
+      .replace(/\n{2,}[\s\S]*$/, "")
       .trim();
 
     log("info", "Question generated", { questionNumber, questionLength: question.length });
