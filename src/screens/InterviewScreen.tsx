@@ -301,9 +301,9 @@ export default function InterviewScreen() {
       // Default: verbally ask the user if they're finished
       setPhase('silence-detected');
       setStatusText('Waiting for you...');
-      setSilenceMessage("Are you finished with your answer? Press Space when you're done.");
+      setSilenceMessage("Are you finished? Press Space when you're done.");
       try {
-        await speakRef.current("It sounds like you might be wrapping up. Are you finished with your answer, or would you like to continue?", stateRef.current.ttsVoice, stateRef.current.ttsSpeed);
+        await speakRef.current("Are you finished, or would you like to keep going?", stateRef.current.ttsVoice, stateRef.current.ttsSpeed);
       } catch (e) {
         log.warn('TTS nudge failed', { error: String(e) });
       }
@@ -731,7 +731,7 @@ export default function InterviewScreen() {
 
     const texts = [
       "Great, let's move on to the next question.",
-      "It sounds like you might be wrapping up. Are you finished with your answer, or would you like to continue?",
+      "Are you finished, or would you like to keep going?",
     ];
     if (nextQuestion) texts.push(nextQuestion.text);
     prefetchTTS(texts, state.ttsVoice, state.ttsSpeed);
@@ -1484,7 +1484,7 @@ export default function InterviewScreen() {
                     willChange: 'transform, filter, opacity',
                     transition: 'opacity 160ms linear, filter 180ms linear',
                     animation: 'starlyFlow 7.2s linear infinite, starlyGlow 1.8s ease-in-out infinite',
-                    animationPlayState: visualizerSpeaking && phase !== 'recording' ? 'running' : 'paused',
+                    animationPlayState: 'paused',
                     animationFillMode: 'both',
                   }}
                 />
