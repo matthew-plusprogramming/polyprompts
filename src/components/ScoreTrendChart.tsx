@@ -130,7 +130,7 @@ function Sparkline({ label, color, values, attemptLabels }: SparklineProps) {
           <line key={v} x1={PAD_X} y1={y} x2={SVG_W - PAD_X} y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth="1" strokeDasharray={v === 0 || v === 100 ? '0' : '3 4'} />
         ))}
         {points.map((p, i) => (
-          <text key={i} x={p.x} y={SVG_H - 1} textAnchor="middle" fill="rgba(148,163,184,0.4)" fontSize="8" fontFamily="DM Mono, monospace">
+          <text key={i} x={p.x} y={SVG_H - 1} textAnchor="middle" fill="rgba(148,163,184,0.4)" fontSize="8" fontFamily="'Josefin Sans', sans-serif">
             {attemptLabels[i]}
           </text>
         ))}
@@ -209,7 +209,7 @@ function OverallChart({ avgValues, attemptLabels }: OverallChartProps) {
             <g key={i}>
               {isLast && <circle cx={p.x} cy={p.y} r="6" fill="none" stroke={lineColor} strokeWidth="1.5" opacity="0.3" />}
               <circle cx={p.x} cy={p.y} r={isLast ? '4' : '3'} fill={lineColor} opacity={isLast ? 1 : 0.6} />
-              <text x={p.x} y={AVG_SVG_H - 2} textAnchor="middle" fill="rgba(148,163,184,0.45)" fontSize="8" fontFamily="DM Mono, monospace">
+              <text x={p.x} y={AVG_SVG_H - 2} textAnchor="middle" fill="rgba(148,163,184,0.45)" fontSize="8" fontFamily="'Josefin Sans', sans-serif">
                 {attemptLabels[i]}
               </text>
             </g>
