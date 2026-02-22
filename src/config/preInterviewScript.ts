@@ -4,7 +4,8 @@ export interface ScriptStep {
   threshold?: number; // similarity threshold 0-1, default 0.7
 
   // Hybrid response: use ONE of these (or both — response is fallback if AI fails)
-  response?: string;
+  // Use string[] to chunk into separate TTS calls (guarantees no truncation)
+  response?: string | string[];
   aiDirective?: string;
 }
 
@@ -20,25 +21,30 @@ export const defaultScript: PreInterviewScript = {
     {
       trigger: 'Hi Starly',
       triggerAliases: ['Hey Starly', 'Hello Starly', 'Hi Starley', 'Hey Starley'],
-      response:
-        "Hey, welcome! I'm Starly, your interview coach — so excited to work with you today. Are you ready to crush this?",
+      response: [
+        "Hey, welcome! I'm Starly, your interview coach — so excited to work with you today.",
+        "Are you ready to crush this?",
+      ],
     },
     {
       trigger: "I'm ready",
       triggerAliases: ['Yes', 'Ready', "Let's go", "Let's do it", 'Yeah', 'Yep', 'Sure', "We're ready"],
-      // aiDirective:
-      //   "The user says they're ready. Don't greet them again (you already said hello). Hype them up briefly, explain you'll ask behavioral questions using the STAR framework, and tell them to take their time.",
-      response:
-        "Love the energy! I'll ask you a couple behavioral questions — just use the STAR framework: Situation, Task, Action, Result. Take your time, there's no rush. Let's do this!",
+      response: [
+        "Love the energy! I'll ask you a couple behavioral questions — just use the STAR framework: Situation, Task, Action, Result.",
+        "Take your time, there's no rush. Let's do this!",
+      ],
     },
   ],
 };
 
-/** Collect all hardcoded response strings for TTS prefetching */
+/** Flatten response chunks into individual strings for TTS prefetching */
 export function getPreInterviewPrefetchTexts(script: PreInterviewScript = defaultScript): string[] {
   const texts: string[] = [];
   for (const step of script.steps) {
-    if (step.response) texts.push(step.response);
+    if (step.response) {
+      const chunks = Array.isArray(step.response) ? step.response : [step.response];
+      texts.push(...chunks);
+    }
   }
   return texts;
 }
