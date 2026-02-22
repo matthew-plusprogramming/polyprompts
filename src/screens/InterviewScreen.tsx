@@ -1513,12 +1513,6 @@ export default function InterviewScreen() {
                 Live Transcript
               </strong>
 
-              {/* Question preview in ready state (full question shows via typewriter during interview) */}
-              {state.currentQuestion && phase === 'ready' && (
-                <span style={{ fontSize: '0.75rem', color: '#94a3b8', maxWidth: '60%', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {state.currentQuestion.text}
-                </span>
-              )}
             </div>
 
             <div
