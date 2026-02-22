@@ -171,22 +171,24 @@ function buildInterviewContext({
   ].join("\n");
 }
 
-async function callGroq({ apiKey, messages, temperature = 0.3, maxTokens = 500, timeoutMs = 20000 }) {
+async function callGroq({ apiKey, messages, temperature = 0.3, maxTokens = 500, timeoutMs = 20000, responseFormat }) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    const body = {
+      model: MODEL,
+      messages,
+      temperature,
+      max_tokens: maxTokens,
+    };
+    if (responseFormat) body.response_format = responseFormat;
     const response = await fetch(GROQ_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model: MODEL,
-        messages,
-        temperature,
-        max_tokens: maxTokens,
-      }),
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
     const data = await response.json().catch(() => ({}));
@@ -282,6 +284,7 @@ export default async function handler(req, res) {
         ],
         temperature: 0,
         maxTokens: 120,
+        responseFormat: { type: "json_object" },
       });
 
       if (!relevanceCheck.ok) {

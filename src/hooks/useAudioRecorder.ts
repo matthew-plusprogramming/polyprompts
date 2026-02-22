@@ -8,7 +8,7 @@ const log = createLogger('AudioRecorder');
 const vadLog = log.child('VAD');
 const volumeLog = log.child('Volume');
 
-const SILENCE_THRESHOLD = 0.07;
+const SILENCE_THRESHOLD = 0.09;
 const SILENCE_DURATION_MS = 3000;
 const VOLUME_CHECK_INTERVAL_MS = 100;
 
@@ -160,9 +160,9 @@ export function useAudioRecorder(options: UseAudioRecorderOptions) {
         micStreamRef.current = s;
         return s;
       },
-      positiveSpeechThreshold: 0.6,
-      negativeSpeechThreshold: 0.3,
-      redemptionMs: 600,
+      positiveSpeechThreshold: 0.55,
+      negativeSpeechThreshold: 0.35,
+      redemptionMs: 500,
       preSpeechPadMs: 400,
       minSpeechMs: 500,
       submitUserSpeechOnPause: false,

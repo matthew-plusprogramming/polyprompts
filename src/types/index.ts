@@ -1,5 +1,11 @@
 export type { FaceMetrics } from './faceDetection';
 
+export interface TimestampedWord {
+  word: string;
+  start: number; // seconds
+  end: number;   // seconds
+}
+
 export type Role = 'swe_intern' | 'pm_intern';
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
@@ -60,7 +66,9 @@ export interface QuestionResult {
   question: Question;
   transcript: string;
   audioBlob?: Blob;
+  videoBlob?: Blob;
   feedback: QuestionFeedback | null;
+  wordTimestamps?: TimestampedWord[];
   metrics: {
     fillerCount: number;
     wordsPerMinute: number;

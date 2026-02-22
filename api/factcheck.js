@@ -10,6 +10,22 @@ function log(level, msg, data) {
   }
 }
 
+const FACTCHECK_SCHEMA = {
+  type: "json_schema",
+  name: "factcheck_result",
+  strict: true,
+  schema: {
+    type: "object",
+    properties: {
+      is_correct: { type: "boolean" },
+      result: { type: "string" },
+      explanation: { type: "string" },
+    },
+    required: ["is_correct", "result", "explanation"],
+    additionalProperties: false,
+  },
+};
+
 export default async function handler(req, res) {
   log("info", "Request received", { method: req.method });
   if (req.method !== "POST") return res.status(405).end();
@@ -41,13 +57,11 @@ Question: ${question}
 Candidate Answer: ${answer}
 User Correction: ${correction}
 
-Respond in JSON ONLY:
-{
-  "is_correct": true|false,
-  "result": "The correction is accurate." | "The correction is not accurate.",
-  "explanation": "Explain in 2-3 sentences why the correction is valid or invalid."
-}
+Determine if the user's correction is factually accurate.
+Set "result" to "The correction is accurate." or "The correction is not accurate."
+Provide a 2-3 sentence explanation of why the correction is valid or invalid.
 `,
+        text: { format: FACTCHECK_SCHEMA },
       }),
     });
 
@@ -58,10 +72,7 @@ Respond in JSON ONLY:
     }
 
     const data = await response.json();
-    let rawText = (data.output_text ?? data.output?.[0]?.content?.[0]?.text ?? "").trim();
-
-    // Strip markdown fences
-    rawText = rawText.replace(/^```json\s*/, "").replace(/```$/, "").trim();
+    const rawText = (data.output_text ?? data.output?.[0]?.content?.[0]?.text ?? "").trim();
 
     let result;
     try {

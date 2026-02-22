@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { createLogger } from '../utils/logger';
+import type { TimestampedWord } from '../types';
 
 const log = createLogger('Deepgram');
 
@@ -31,12 +32,14 @@ export function useDeepgramTranscription() {
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const stoppedRef = useRef(false);
+  const wordsRef = useRef<TimestampedWord[]>([]);
 
   // ─── start ────────────────────────────────────────────────────────────
   const start = useCallback(async (stream: MediaStream) => {
     stoppedRef.current = false;
     setFinalTranscript('');
     setInterimTranscript('');
+    wordsRef.current = [];
 
     // 1. Get Deepgram API key from env
     const dgKey = (import.meta.env.VITE_DEEPGRAM_API_KEY ?? '').trim();
@@ -67,6 +70,13 @@ export function useDeepgramTranscription() {
           finalCount++;
           setFinalTranscript((prev) => (prev ? prev + ' ' + text : text));
           setInterimTranscript('');
+
+          // Capture word-level timestamps
+          const words: Array<{ word: string; start: number; end: number }> = alt.words ?? [];
+          for (const w of words) {
+            wordsRef.current.push({ word: w.word, start: w.start, end: w.end });
+          }
+
           if (finalCount % 5 === 0) {
             log.debug('Transcript accumulation', { finalResults: finalCount });
           }
@@ -150,6 +160,11 @@ export function useDeepgramTranscription() {
     return (finalTranscript + (interimTranscript ? ' ' + interimTranscript : '')).trim();
   }, [finalTranscript, interimTranscript]);
 
+  // ─── getWordTimestamps ─────────────────────────────────────────────
+  const getWordTimestamps = useCallback(() => {
+    return [...wordsRef.current];
+  }, []);
+
   // ─── Cleanup on unmount ───────────────────────────────────────────────
   useEffect(() => {
     return () => {
@@ -168,5 +183,6 @@ export function useDeepgramTranscription() {
     finalTranscript,
     interimTranscript,
     getFullTranscript,
+    getWordTimestamps,
   };
 }

@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInterview } from "../context/InterviewContext";
+import { useTTS } from "../hooks/useTTS";
 import { factCheck } from "../services/api";
+import { prefetchTTS } from "../services/openai";
+import { findQuoteTimeRange } from "../utils/quoteTimestamps";
 import type { FactCheckResult, FaceMetrics } from "../types";
 import "./FeedbackScreen.css";
 import { createLogger } from "../utils/logger";
@@ -19,9 +22,22 @@ const dimensions = [
 
 type DimensionKey = (typeof dimensions)[number]["key"];
 
+type GuidedPhase = 'idle' | 'intro' | 'clip-best' | 'narrate-best' | 'clip-worst' | 'narrate-worst' | 'outro';
+
+const guidedPhaseLabel: Record<GuidedPhase, string> = {
+  idle: '',
+  intro: 'Introduction',
+  'clip-best': 'Playing best moment',
+  'narrate-best': 'Explaining strength',
+  'clip-worst': 'Playing area to improve',
+  'narrate-worst': 'Explaining improvement',
+  outro: 'Closing summary',
+};
+
 export default function FeedbackScreen() {
   const { state, dispatch } = useInterview();
   const navigate = useNavigate();
+  const { speak, stopPlayback } = useTTS();
 
   const questionResults = state.questionResults;
   const hasMultipleResults = questionResults.length > 0;
@@ -53,6 +69,198 @@ export default function FeedbackScreen() {
       headStability: Math.round(sum.headStability / n),
       nervousnessScore: Math.round(sum.nervousnessScore / n),
       confidenceScore: Math.round(sum.confidenceScore / n),
+    };
+  }, [questionResults]);
+
+  // ─── Video blob URL management ───
+  const [videoBlobUrls, setVideoBlobUrls] = useState<Record<number, string>>({});
+  const [playingVideoIdx, setPlayingVideoIdx] = useState<number | null>(null);
+
+  // ─── Clip playback state ───
+  const [clipRange, setClipRange] = useState<{ idx: number; start: number; end: number } | null>(null);
+  const videoRefs = useRef<Record<number, HTMLVideoElement | null>>({});
+
+  // ─── Guided review state ───
+  const [guidedPhase, setGuidedPhase] = useState<GuidedPhase>('idle');
+  const [guidedQuestionIdx, setGuidedQuestionIdx] = useState(0);
+  const guidedCancelledRef = useRef(false);
+  const clipResolveRef = useRef<(() => void) | null>(null);
+
+  const handlePlayClip = useCallback((questionIdx: number, quote: string) => {
+    // Cancel guided review if active
+    if (guidedPhase !== 'idle') {
+      guidedCancelledRef.current = true;
+      stopPlayback();
+      if (clipResolveRef.current) {
+        clipResolveRef.current();
+        clipResolveRef.current = null;
+      }
+      setGuidedPhase('idle');
+    }
+
+    const qr = questionResults[questionIdx];
+    if (!qr?.wordTimestamps?.length) return;
+
+    const range = findQuoteTimeRange(quote, qr.wordTimestamps);
+    if (!range) {
+      log.warn('No matching time range for quote', { questionIdx, quote: quote.slice(0, 50) });
+      return;
+    }
+
+    const video = videoRefs.current[questionIdx];
+    if (!video) return;
+
+    setClipRange({ idx: questionIdx, start: range.start, end: range.end });
+    video.currentTime = range.start;
+    void video.play();
+  }, [questionResults, guidedPhase, stopPlayback]);
+
+  const playClipAsync = useCallback((questionIdx: number, quote: string): Promise<void> => {
+    return new Promise<void>((resolve) => {
+      const qr = questionResults[questionIdx];
+      if (!qr?.wordTimestamps?.length || !videoBlobUrls[questionIdx]) {
+        resolve();
+        return;
+      }
+
+      const range = findQuoteTimeRange(quote, qr.wordTimestamps);
+      if (!range) {
+        log.warn('Guided: no matching time range', { questionIdx });
+        resolve();
+        return;
+      }
+
+      const video = videoRefs.current[questionIdx];
+      if (!video) {
+        resolve();
+        return;
+      }
+
+      clipResolveRef.current = resolve;
+      setClipRange({ idx: questionIdx, start: range.start, end: range.end });
+      video.currentTime = range.start;
+      void video.play().catch(() => {
+        clipResolveRef.current = null;
+        resolve();
+      });
+    });
+  }, [questionResults, videoBlobUrls]);
+
+  const cancelGuidedReview = useCallback(() => {
+    guidedCancelledRef.current = true;
+    stopPlayback();
+    if (clipResolveRef.current) {
+      clipResolveRef.current();
+      clipResolveRef.current = null;
+    }
+    Object.values(videoRefs.current).forEach(video => {
+      if (video && !video.paused) video.pause();
+    });
+    setClipRange(null);
+    setGuidedPhase('idle');
+    setGuidedQuestionIdx(0);
+  }, [stopPlayback]);
+
+  const runGuidedReview = useCallback(async () => {
+    const { ttsVoice, ttsSpeed } = state;
+    // 20% faster TTS for guided review narration
+    const guidedSpeed = Math.min(4.0, ttsSpeed * 1.2);
+    const questions = feedbackResponse?.questions ?? [];
+    const overallData = feedbackResponse?.overall;
+
+    if (!overallData || questions.length === 0) return;
+
+    guidedCancelledRef.current = false;
+    setReviewOpen(true);
+
+    // Wait for React to render the review body + video elements
+    await new Promise(resolve => setTimeout(resolve, 300));
+    if (guidedCancelledRef.current) return;
+
+    // Prefetch all TTS texts at guided speed
+    const introText = `Let's review your interview. You scored ${Math.round(overallData.score)}% overall. Let me walk you through each question.`;
+    const outroText = overallData.summary || 'That completes your interview review. Keep practicing!';
+    const allTexts = [introText];
+    for (const q of questions) {
+      if (q.best_part_explanation) allTexts.push(q.best_part_explanation);
+      if (q.worst_part_explanation) allTexts.push(q.worst_part_explanation);
+    }
+    allTexts.push(outroText);
+    prefetchTTS(allTexts, ttsVoice, guidedSpeed);
+
+    // Intro
+    setGuidedPhase('intro');
+    setGuidedQuestionIdx(-1);
+    try { await speak(introText, ttsVoice, guidedSpeed); } catch { /* interrupted */ }
+    if (guidedCancelledRef.current) return;
+
+    // Per-question loop
+    for (let idx = 0; idx < questions.length; idx++) {
+      if (guidedCancelledRef.current) return;
+
+      const qFeedback = questions[idx];
+      setGuidedQuestionIdx(idx);
+
+      // Scroll question into view
+      setTimeout(() => {
+        document.getElementById(`guided-question-${idx}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+
+      // Best part
+      if (qFeedback.best_part_quote) {
+        setGuidedPhase('clip-best');
+        await playClipAsync(idx, qFeedback.best_part_quote);
+        if (guidedCancelledRef.current) return;
+
+        setGuidedPhase('narrate-best');
+        try { await speak(qFeedback.best_part_explanation, ttsVoice, guidedSpeed); } catch { /* interrupted */ }
+        if (guidedCancelledRef.current) return;
+      }
+
+      // Worst part
+      if (qFeedback.worst_part_quote) {
+        setGuidedPhase('clip-worst');
+        await playClipAsync(idx, qFeedback.worst_part_quote);
+        if (guidedCancelledRef.current) return;
+
+        setGuidedPhase('narrate-worst');
+        try { await speak(qFeedback.worst_part_explanation, ttsVoice, guidedSpeed); } catch { /* interrupted */ }
+        if (guidedCancelledRef.current) return;
+      }
+    }
+
+    // Outro
+    if (guidedCancelledRef.current) return;
+    setGuidedPhase('outro');
+    setGuidedQuestionIdx(-1);
+    try { await speak(outroText, ttsVoice, guidedSpeed); } catch { /* interrupted */ }
+
+    setGuidedPhase('idle');
+    setGuidedQuestionIdx(0);
+  }, [state, feedbackResponse, speak, playClipAsync]);
+
+  // Cleanup guided review on unmount
+  useEffect(() => {
+    return () => {
+      guidedCancelledRef.current = true;
+      if (clipResolveRef.current) {
+        clipResolveRef.current();
+        clipResolveRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const urls: Record<number, string> = {};
+    questionResults.forEach((qr, idx) => {
+      if (qr.videoBlob) {
+        urls[idx] = URL.createObjectURL(qr.videoBlob);
+      }
+    });
+    setVideoBlobUrls(urls);
+
+    return () => {
+      Object.values(urls).forEach((url) => URL.revokeObjectURL(url));
     };
   }, [questionResults]);
 
@@ -343,24 +551,93 @@ export default function FeedbackScreen() {
           <div className="feedback__card feedback__card--review">
             <div className="feedback__review-header">
               <h2>Review Questions & Responses</h2>
-              <button
-                type="button"
-                className="feedback__review-toggle"
-                onClick={() => setReviewOpen((open) => !open)}
-              >
-                {reviewOpen ? "Hide" : "Review"}
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                {guidedPhase !== 'idle' ? (
+                  <button
+                    type="button"
+                    className="feedback__review-toggle"
+                    onClick={cancelGuidedReview}
+                    style={{ borderColor: 'rgba(248,113,113,0.4)', color: '#f87171' }}
+                  >
+                    Stop Review
+                  </button>
+                ) : (
+                  feedbackResponse && questionResults.length > 0 && (
+                    <button
+                      type="button"
+                      className="feedback__review-toggle"
+                      onClick={() => void runGuidedReview()}
+                      style={{ borderColor: 'rgba(129,140,248,0.4)', color: '#a5b4fc' }}
+                    >
+                      Guided Review
+                    </button>
+                  )
+                )}
+                <button
+                  type="button"
+                  className="feedback__review-toggle"
+                  onClick={() => setReviewOpen((open) => !open)}
+                >
+                  {reviewOpen ? "Hide" : "Review"}
+                </button>
+              </div>
             </div>
 
             {reviewOpen && (
               <div className="feedback__review-body">
+                {guidedPhase !== 'idle' && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    padding: '0.6rem 0.9rem',
+                    borderRadius: '10px',
+                    background: 'rgba(129,140,248,0.08)',
+                    border: '1px solid rgba(129,140,248,0.2)',
+                    marginBottom: '0.25rem',
+                  }}>
+                    <div style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: '#818cf8',
+                      boxShadow: '0 0 8px rgba(129,140,248,0.6)',
+                      animation: 'glowPulse 1.5s ease-in-out infinite',
+                      flexShrink: 0,
+                    }} />
+                    <span style={{ fontSize: '0.72rem', color: '#a5b4fc', letterSpacing: '0.06em' }}>
+                      {guidedQuestionIdx >= 0
+                        ? `Q${guidedQuestionIdx + 1}: ${guidedPhaseLabel[guidedPhase]}`
+                        : guidedPhaseLabel[guidedPhase]}
+                    </span>
+                    {guidedQuestionIdx >= 0 && (
+                      <span style={{ marginLeft: 'auto', fontSize: '0.65rem', color: '#6366f1' }}>
+                        {guidedQuestionIdx + 1} / {questionResults.length}
+                      </span>
+                    )}
+                  </div>
+                )}
                 {hasMultipleResults ? (
                   questionResults.map((qr, idx) => {
                     const qFeedback = feedbackResponse?.questions[idx] ?? null;
                     const fcResult = factcheckResults[idx];
                     const fcLoading = factcheckLoading[idx];
                     return (
-                      <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <div
+                        key={idx}
+                        id={`guided-question-${idx}`}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.75rem',
+                          ...(guidedPhase !== 'idle' && guidedQuestionIdx === idx ? {
+                            outline: '1px solid rgba(129,140,248,0.3)',
+                            outlineOffset: '6px',
+                            borderRadius: '12px',
+                            transition: 'outline-color 0.3s ease',
+                          } : {}),
+                        }}
+                      >
                         <div className="feedback__review-block">
                           <span>Question {idx + 1}</span>
                           <p>{qr.question.text}</p>
@@ -369,6 +646,85 @@ export default function FeedbackScreen() {
                           <span>Your Response</span>
                           <p>{qr.transcript || "Response will appear after recording."}</p>
                         </div>
+                        {videoBlobUrls[idx] && (
+                          <div style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden' }}>
+                            <video
+                              ref={(el) => { videoRefs.current[idx] = el; }}
+                              src={videoBlobUrls[idx]}
+                              controls
+                              playsInline
+                              onPlay={() => setPlayingVideoIdx(idx)}
+                              onPause={() => setPlayingVideoIdx((prev) => prev === idx ? null : prev)}
+                              onEnded={() => {
+                                setPlayingVideoIdx((prev) => prev === idx ? null : prev);
+                                setClipRange((prev) => prev?.idx === idx ? null : prev);
+                                if (clipResolveRef.current) {
+                                  const resolve = clipResolveRef.current;
+                                  clipResolveRef.current = null;
+                                  resolve();
+                                }
+                              }}
+                              onTimeUpdate={(e) => {
+                                if (clipRange && clipRange.idx === idx) {
+                                  const video = e.currentTarget;
+                                  if (video.currentTime >= clipRange.end) {
+                                    video.pause();
+                                    setClipRange(null);
+                                    if (clipResolveRef.current) {
+                                      const resolve = clipResolveRef.current;
+                                      clipResolveRef.current = null;
+                                      resolve();
+                                    }
+                                  }
+                                }
+                              }}
+                              onSeeked={(e) => {
+                                if (clipRange && clipRange.idx === idx) {
+                                  const t = e.currentTarget.currentTime;
+                                  if (t < clipRange.start - 0.5 || t > clipRange.end + 0.5) {
+                                    setClipRange(null);
+                                  }
+                                }
+                              }}
+                              style={{
+                                width: '100%',
+                                maxHeight: '300px',
+                                borderRadius: '10px',
+                                transform: 'scaleX(-1)',
+                                background: '#000',
+                              }}
+                            />
+                            {playingVideoIdx === idx && qFeedback && (
+                              <div style={{
+                                position: 'absolute',
+                                bottom: '40px',
+                                left: '8px',
+                                right: '8px',
+                                padding: '0.6rem 0.8rem',
+                                borderRadius: '8px',
+                                background: 'rgba(0, 0, 0, 0.75)',
+                                backdropFilter: 'blur(6px)',
+                                pointerEvents: 'none',
+                              }}>
+                                {qFeedback.what_went_well && (
+                                  <p style={{ margin: '0 0 0.25rem', fontSize: '0.7rem', color: '#4ade80' }}>
+                                    <strong>Well done:</strong> {qFeedback.what_went_well}
+                                  </p>
+                                )}
+                                {qFeedback.needs_improvement && (
+                                  <p style={{ margin: '0 0 0.25rem', fontSize: '0.7rem', color: '#fbbf24' }}>
+                                    <strong>Improve:</strong> {qFeedback.needs_improvement}
+                                  </p>
+                                )}
+                                {qFeedback.best_part_quote && (
+                                  <p style={{ margin: 0, fontSize: '0.65rem', color: '#a7f3d0', fontStyle: 'italic' }}>
+                                    &ldquo;{qFeedback.best_part_quote}&rdquo;
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
                         {qFeedback && (
                           <div style={{
                             display: 'flex',
@@ -406,14 +762,62 @@ export default function FeedbackScreen() {
                             </p>
                             {qFeedback.best_part_quote && (
                               <div style={{ padding: '0.5rem', borderRadius: '8px', background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)' }}>
-                                <span style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: '#34d399', display: 'block', marginBottom: '0.25rem' }}>Best Part</span>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                                  <span style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: '#34d399' }}>Best Part</span>
+                                  {qr.wordTimestamps?.length && videoBlobUrls[idx] && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handlePlayClip(idx, qFeedback.best_part_quote)}
+                                      style={{
+                                        padding: '2px 10px',
+                                        borderRadius: '999px',
+                                        border: '1px solid rgba(52,211,153,0.3)',
+                                        background: clipRange?.idx === idx
+                                          ? 'rgba(52,211,153,0.2)'
+                                          : 'rgba(52,211,153,0.08)',
+                                        color: '#34d399',
+                                        fontSize: '0.58rem',
+                                        fontWeight: '600',
+                                        letterSpacing: '0.04em',
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                    >
+                                      Play Best Part
+                                    </button>
+                                  )}
+                                </div>
                                 <p style={{ margin: 0, fontSize: '0.75rem', color: '#a7f3d0', fontStyle: 'italic' }}>"{qFeedback.best_part_quote}"</p>
                                 <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: '#9ca3af' }}>{qFeedback.best_part_explanation}</p>
                               </div>
                             )}
                             {qFeedback.worst_part_quote && (
                               <div style={{ padding: '0.5rem', borderRadius: '8px', background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.15)' }}>
-                                <span style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: '#f87171', display: 'block', marginBottom: '0.25rem' }}>Needs Work</span>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                                  <span style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: '#f87171' }}>Needs Work</span>
+                                  {qr.wordTimestamps?.length && videoBlobUrls[idx] && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handlePlayClip(idx, qFeedback.worst_part_quote)}
+                                      style={{
+                                        padding: '2px 10px',
+                                        borderRadius: '999px',
+                                        border: '1px solid rgba(248,113,113,0.3)',
+                                        background: clipRange?.idx === idx
+                                          ? 'rgba(248,113,113,0.2)'
+                                          : 'rgba(248,113,113,0.08)',
+                                        color: '#f87171',
+                                        fontSize: '0.58rem',
+                                        fontWeight: '600',
+                                        letterSpacing: '0.04em',
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                    >
+                                      Play Worst Part
+                                    </button>
+                                  )}
+                                </div>
                                 <p style={{ margin: 0, fontSize: '0.75rem', color: '#fca5a5', fontStyle: 'italic' }}>"{qFeedback.worst_part_quote}"</p>
                                 <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: '#9ca3af' }}>{qFeedback.worst_part_explanation}</p>
                               </div>

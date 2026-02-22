@@ -28,7 +28,7 @@ const initialState: InterviewState = {
   resumeData: null,
   sessionHistory: [],
   ttsVoice: 'alloy',
-  ttsSpeed: 1.0,
+  ttsSpeed: 1.05,
 };
 
 function interviewReducer(state: InterviewState, action: InterviewAction): InterviewState {
