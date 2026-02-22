@@ -1372,8 +1372,8 @@ export default function InterviewScreen() {
                   padding: '8px 24px',
                   marginBottom: '0.25rem',
                   borderRadius: '14px',
-                  background: 'transparent',
-                  border: '1px solid transparent',
+                  background: 'rgba(99,102,241,0.06)',
+                  border: '1px solid rgba(99,102,241,0.16)',
                   animation: phase === 'thinking' ? 'breathing 2s ease-in-out infinite' : 'none',
                 }}
               >
