@@ -116,6 +116,7 @@ export interface InterviewState {
   sessionHistory: Session[];
   ttsVoice: string;
   ttsSpeed: number;
+  voiceSummary: string | null;
 }
 
 export type InterviewAction =
@@ -140,4 +141,5 @@ export type InterviewAction =
   | { type: 'NEXT_QUESTION' }
   | { type: 'SAVE_SESSION'; payload: Session }
   | { type: 'SET_TTS_VOICE'; payload: string }
-  | { type: 'SET_TTS_SPEED'; payload: number };
+  | { type: 'SET_TTS_SPEED'; payload: number }
+  | { type: 'SET_VOICE_SUMMARY'; payload: string };

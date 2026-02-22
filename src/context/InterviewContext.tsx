@@ -31,6 +31,7 @@ const initialState: InterviewState = {
   sessionHistory: [],
   ttsVoice: 'alloy',
   ttsSpeed: 1.05,
+  voiceSummary: null,
 };
 
 function interviewReducer(state: InterviewState, action: InterviewAction): InterviewState {
@@ -100,6 +101,8 @@ function interviewReducer(state: InterviewState, action: InterviewAction): Inter
       return { ...state, isScoring: false, feedbackResponse: action.payload };
     case 'SET_TOTAL_DURATION':
       return { ...state, totalDurationSeconds: action.payload };
+    case 'SET_VOICE_SUMMARY':
+      return { ...state, voiceSummary: action.payload };
     case 'RETRY':
       return {
         ...state,
@@ -111,6 +114,7 @@ function interviewReducer(state: InterviewState, action: InterviewAction): Inter
         audioBlob: null,
         isScoring: false,
         feedbackResponse: null,
+        voiceSummary: null,
         previousAttempts: state.feedbackResponse
           ? [...state.previousAttempts, state.feedbackResponse]
           : state.previousAttempts,
