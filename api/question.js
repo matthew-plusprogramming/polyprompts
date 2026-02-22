@@ -49,7 +49,8 @@ STRICT RULES:
 - Do NOT include explanations, conclusions, or preamble
 - Do NOT include phrases like "Sure!" or "Here is a question"
 - Do NOT include numbering
-- Keep it concise but allow enough detail for context — aim for 20–40 words${jobDescription ? '\n- Start with a brief, natural company/role context from the job description, e.g. "In this role you\'d be working on X — tell me about a time..." or "We value Y on our team — can you describe..." Keep the lead-in short (under 15 words) then ask the behavioral question' : '\n- A brief conversational lead-in like "Tell me about a time when..." is fine'}
+- Keep it concise but allow enough detail for context — aim for 20–40 words
+- Do not ask questions requiring the candidate to reveal proprietary or confidential information${jobDescription ? '\n- Start with a brief, natural company/role context from the job description, e.g. "In this role you\'d be working on X — tell me about a time..." or "We value Y on our team — can you describe..." Keep the lead-in short (under 15 words) then ask the behavioral question' : '\n- A brief conversational lead-in like "Tell me about a time when..." is fine'}
 
 Previously asked questions:
 ${previousQuestions?.join("\n") || "None"}

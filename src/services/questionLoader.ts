@@ -1,5 +1,5 @@
 import type { Difficulty, Question, Role } from '../types';
-import { generateQuestion, generateResumeQuestion } from './api';
+import { generateQuestion, generateResumeQuestion, generateJobDescQuestion } from './api';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('QuestionLoader');
@@ -10,6 +10,7 @@ export interface QuestionLoadConfig {
   count: number;
   resumeText?: string;
   jobDescription?: string;
+  candidateName?: string;
 }
 
 /* ── Similarity check ── */
@@ -56,30 +57,48 @@ function questionsSimilar(a: string, b: string): boolean {
 
 const MAX_REGEN_ATTEMPTS = 2;
 
+async function generateForIndex(
+  i: number,
+  config: QuestionLoadConfig,
+  previousQuestions: string[],
+): Promise<{ text: string; category: string }> {
+  const { role, resumeText, jobDescription, candidateName } = config;
+  const useResume = Boolean(resumeText && jobDescription);
+
+  if (useResume && i === 0) {
+    // Q1: resume-focused question
+    const result = await generateResumeQuestion(
+      resumeText!,
+      jobDescription!,
+      i + 1,
+      previousQuestions,
+      candidateName,
+    );
+    return { text: result.question, category: result.type || 'behavioral' };
+  } else if (useResume && i >= 1) {
+    // Q2+: job-description-focused question
+    const result = await generateJobDescQuestion(
+      jobDescription!,
+      i + 1,
+      previousQuestions,
+      resumeText,
+      candidateName,
+    );
+    return { text: result.question, category: result.type || 'behavioral' };
+  } else {
+    const text = await generateQuestion(role, i + 1, previousQuestions, jobDescription);
+    return { text, category: 'behavioral' };
+  }
+}
+
 export async function loadQuestions(config: QuestionLoadConfig): Promise<Question[]> {
-  const { role, difficulty, count, resumeText, jobDescription } = config;
+  const { role, difficulty, count } = config;
   const questions: Question[] = [];
   const previousQuestions: string[] = [];
 
-  const useResume = Boolean(resumeText && jobDescription);
-
   // Generate questions sequentially so each call can avoid duplicates
   for (let i = 0; i < count; i++) {
-    let text: string;
-    let category = 'behavioral';
-
-    if (useResume) {
-      const result = await generateResumeQuestion(
-        resumeText!,
-        jobDescription!,
-        i + 1,
-        previousQuestions,
-      );
-      text = result.question;
-      category = result.type || 'behavioral';
-    } else {
-      text = await generateQuestion(role, i + 1, previousQuestions, jobDescription);
-    }
+    let { text, category } = await generateForIndex(i, config, previousQuestions);
 
     // Similarity guard: if this question is too similar to a previous one, regenerate
     if (i > 0) {
@@ -87,18 +106,9 @@ export async function loadQuestions(config: QuestionLoadConfig): Promise<Questio
       while (attempts < MAX_REGEN_ATTEMPTS && previousQuestions.some(prev => questionsSimilar(prev, text))) {
         log.info('Question too similar, regenerating', { attempt: attempts + 1, questionIndex: i });
         const strengthenedPrev = [...previousQuestions, text];
-        if (useResume) {
-          const result = await generateResumeQuestion(
-            resumeText!,
-            jobDescription!,
-            i + 1,
-            strengthenedPrev,
-          );
-          text = result.question;
-          category = result.type || 'behavioral';
-        } else {
-          text = await generateQuestion(role, i + 1, strengthenedPrev, jobDescription);
-        }
+        const regen = await generateForIndex(i, config, strengthenedPrev);
+        text = regen.text;
+        category = regen.category;
         attempts++;
       }
     }

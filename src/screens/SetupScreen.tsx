@@ -6,6 +6,7 @@ import { prefetchTTS } from '../services/openai';
 import { getPreInterviewPrefetchTexts } from '../config/preInterviewScript';
 import type { Difficulty, Role } from '../types';
 import { createLogger } from '../utils/logger';
+import { extractNameFromResume } from '../utils/resumeName';
 
 const log = createLogger('Setup');
 
@@ -1177,6 +1178,7 @@ export default function SetupScreen() {
     const isGenericReady = mode === 'generic';
     if (!isResumeReady && !isGenericReady) return;
 
+    const candidateName = mode === 'resume' && resumeResult ? extractNameFromResume(resumeResult.text) : null;
     const cacheKey = `${mappedRole}:${difficulty}:${mode}:${resumeResult?.text?.slice(0, 50) ?? ''}:${jobDescription.slice(0, 50)}`;
     if (prefetchedQuestionsRef.current?.key === cacheKey) return;
 
@@ -1185,7 +1187,7 @@ export default function SetupScreen() {
       role: mappedRole,
       difficulty,
       count: 2,
-      ...(mode === 'resume' && resumeResult ? { resumeText: resumeResult.text, jobDescription: jobDescription.trim() } : {}),
+      ...(mode === 'resume' && resumeResult ? { resumeText: resumeResult.text, jobDescription: jobDescription.trim(), ...(candidateName ? { candidateName } : {}) } : {}),
     });
     prefetchedQuestionsRef.current = { key: cacheKey, promise };
 
@@ -1221,6 +1223,8 @@ export default function SetupScreen() {
     if (mode === 'resume' && resumeResult && jobDescription.trim()) {
       dispatch({ type: 'SET_RESUME_TEXT', payload: resumeResult.text });
       dispatch({ type: 'SET_JOB_DESCRIPTION', payload: jobDescription.trim() });
+      const name = extractNameFromResume(resumeResult.text);
+      if (name) dispatch({ type: 'SET_CANDIDATE_NAME', payload: name });
     }
 
     try {
@@ -1232,11 +1236,12 @@ export default function SetupScreen() {
         questions = await prefetchedQuestionsRef.current.promise;
       } else {
         log.info('Prefetch miss, generating questions fresh');
+        const freshName = mode === 'resume' && resumeResult ? extractNameFromResume(resumeResult.text) : null;
         questions = await loadQuestions({
           role: mappedRole,
           difficulty,
           count: 2,
-          ...(mode === 'resume' && resumeResult ? { resumeText: resumeResult.text, jobDescription: jobDescription.trim() } : {}),
+          ...(mode === 'resume' && resumeResult ? { resumeText: resumeResult.text, jobDescription: jobDescription.trim(), ...(freshName ? { candidateName: freshName } : {}) } : {}),
         });
       }
 
