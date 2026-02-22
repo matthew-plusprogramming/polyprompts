@@ -19,7 +19,7 @@ const initialState: InterviewState = {
   liveTranscript: '',
   audioBlob: null,
   isScoring: false,
-  currentResult: null,
+  feedbackResponse: null,
   previousAttempts: [],
   fillerCount: 0,
   wordsPerMinute: 0,
@@ -54,11 +54,11 @@ function interviewReducer(state: InterviewState, action: InterviewAction): Inter
         ...state,
         questionResults: [...state.questionResults, action.payload],
       };
-    case 'UPDATE_QUESTION_SCORING': {
-      const { index, scoringResult } = action.payload;
+    case 'UPDATE_QUESTION_FEEDBACK': {
+      const { index, feedback } = action.payload;
       const updatedResults = [...state.questionResults];
       if (updatedResults[index]) {
-        updatedResults[index] = { ...updatedResults[index], scoringResult };
+        updatedResults[index] = { ...updatedResults[index], feedback };
       }
       return { ...state, questionResults: updatedResults };
     }
@@ -90,8 +90,8 @@ function interviewReducer(state: InterviewState, action: InterviewAction): Inter
       return { ...state, ...action.payload };
     case 'START_SCORING':
       return { ...state, isScoring: true };
-    case 'SET_RESULT':
-      return { ...state, isScoring: false, currentResult: action.payload };
+    case 'SET_FEEDBACK_RESPONSE':
+      return { ...state, isScoring: false, feedbackResponse: action.payload };
     case 'SET_TOTAL_DURATION':
       return { ...state, totalDurationSeconds: action.payload };
     case 'RETRY':
@@ -104,9 +104,9 @@ function interviewReducer(state: InterviewState, action: InterviewAction): Inter
         liveTranscript: '',
         audioBlob: null,
         isScoring: false,
-        currentResult: null,
-        previousAttempts: state.currentResult
-          ? [...state.previousAttempts, state.currentResult]
+        feedbackResponse: null,
+        previousAttempts: state.feedbackResponse
+          ? [...state.previousAttempts, state.feedbackResponse]
           : state.previousAttempts,
         fillerCount: 0,
         wordsPerMinute: 0,
