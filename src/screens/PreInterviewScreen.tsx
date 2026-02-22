@@ -231,8 +231,8 @@ export default function PreInterviewScreen() {
           to   { opacity: 1; transform: translateY(0); }
         }
         @keyframes starlyFlow {
-          0% { transform: translate(-50%, -50%) rotate(0deg); }
-          100% { transform: translate(-50%, -50%) rotate(360deg); }
+          0%, 100% { transform: translate(-50%, -50%) scale(1); }
+          50% { transform: translate(-50%, -50%) scale(1.06); }
         }
         @keyframes starlyGlow {
           0%, 100% { filter: invert(1) brightness(1.25) drop-shadow(0 0 12px rgba(255, 255, 255, 0.4)) drop-shadow(0 0 26px rgba(180, 210, 255, 0.25)); }
@@ -314,8 +314,7 @@ export default function PreInterviewScreen() {
             mixBlendMode: 'screen',
             transformOrigin: '50% 50%',
             transition: 'opacity 160ms linear, filter 180ms linear',
-            animation: 'starlyFlow 7.2s linear infinite, starlyGlow 1.8s ease-in-out infinite',
-            animationPlayState: ttsPlaying ? 'running' : 'paused',
+            animation: 'starlyFlow 3s ease-in-out infinite, starlyGlow 1.8s ease-in-out infinite',
             animationFillMode: 'both',
           }}
         />
