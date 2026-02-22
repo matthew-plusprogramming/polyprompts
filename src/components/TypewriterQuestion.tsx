@@ -83,9 +83,9 @@ export default function TypewriterQuestion({
     <div
       style={{
         position: 'relative',
-        padding: '18px 28px',
-        background: 'rgba(99,102,241,0.06)',
-        border: '1px solid rgba(99,102,241,0.16)',
+        padding: '18px 17.6px',
+        background: 'transparent',
+        border: '1px solid #2a2a2a',
         borderRadius: '16px',
         marginBottom: '0.4rem',
         overflow: 'hidden',
@@ -101,7 +101,7 @@ export default function TypewriterQuestion({
           left: '8%',
           right: '8%',
           height: '1px',
-          background: 'linear-gradient(90deg, transparent, rgba(99,102,241,0.45), rgba(34,211,238,0.35), transparent)',
+          background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)',
         }}
       />
 
@@ -119,7 +119,7 @@ export default function TypewriterQuestion({
             width: '6px',
             height: '6px',
             borderRadius: '50%',
-            background: '#a78bfa',
+            background: '#f5f5f5',
             flexShrink: 0,
             animation: isTyping ? 'pulse-ring 1.4s ease-out infinite' : 'none',
             opacity: isTyping ? 1 : 0.4,
@@ -128,12 +128,12 @@ export default function TypewriterQuestion({
         />
         <span
           style={{
-            fontFamily: "'DM Mono', monospace",
+            fontFamily: "'Josefin Sans', sans-serif",
             fontSize: '10px',
             fontWeight: '700',
             letterSpacing: '0.12em',
             textTransform: 'uppercase',
-            color: isTyping ? '#a78bfa' : '#64748b',
+            color: isTyping ? '#cbff70' : '#9ca3af',
             transition: 'color 0.3s ease',
           }}
         >
@@ -144,13 +144,11 @@ export default function TypewriterQuestion({
       {/* Question text with typewriter effect */}
       <p
         style={{
-          margin: 0,
-          fontFamily: "'Syne', 'Space Grotesk', sans-serif",
-          fontSize: 'clamp(16px, 2.2vw, 22px)',
-          fontWeight: 700,
-          lineHeight: 1.55,
-          letterSpacing: '-0.005em',
-          color: '#f0f0f5',
+          marginTop: 0,
+          marginBottom: 0,
+          fontSize: '16px',
+          lineHeight: 1.54,
+          color: '#d7d7d7',
           minHeight: '1.55em',
         }}
       >
@@ -161,7 +159,7 @@ export default function TypewriterQuestion({
               display: 'inline-block',
               width: '2px',
               height: '1em',
-              background: '#a78bfa',
+              background: '#cbff70',
               marginLeft: '2px',
               verticalAlign: 'text-bottom',
               animation: 'cursorBlink 0.6s step-end infinite',

@@ -815,6 +815,8 @@ export default function InterviewScreen() {
   const questionLabel = state.questions.length > 1
     ? `Q${state.currentQuestionIndex + 1}/${state.questions.length}`
     : '';
+  const testQuestionText = 'Test Question: Tell me about a time you solved a difficult problem under pressure.';
+  const testTranscriptText = 'Test Transcript: I focused on the root cause, aligned with my team, and delivered a measurable improvement.';
 
   const phaseLabel: Record<ScreenPhase, string> = {
     ready: 'Ready',
@@ -829,14 +831,14 @@ export default function InterviewScreen() {
   };
 
   const phaseBadgeColor: Record<ScreenPhase, string> = {
-    ready: '#6366f1',
-    'speaking-question': '#a78bfa',
-    thinking: '#818cf8',
-    recording: '#22d3ee',
-    'silence-detected': '#f59e0b',
-    'asking-done': '#34d399',
+    ready: '#9ca3af',
+    'speaking-question': '#f5f5f5',
+    thinking: '#d1d5db',
+    recording: '#cbff70',
+    'silence-detected': '#e5e7eb',
+    'asking-done': '#cbff70',
     'mic-error': '#f87171',
-    transitioning: '#a78bfa',
+    transitioning: '#f5f5f5',
     finished: '#6b7280',
   };
 
@@ -845,6 +847,7 @@ export default function InterviewScreen() {
   // ─── RENDER: Main's visual layout + Matthew's phase-driven overlays ───
   return (
     <div
+      className="interview-screen-root"
       style={{
         height: '100vh',
         padding: '0.7rem 0.45rem',
@@ -858,17 +861,48 @@ export default function InterviewScreen() {
         flexDirection: 'column',
         borderRadius: '26px',
         border: '1px solid rgba(255, 255, 255, 0.14)',
-        color: '#eef8ff',
-        backgroundColor: '#050a14',
-        background:
-          'radial-gradient(circle at 12% -5%, rgba(255, 255, 255, 0.14), transparent 34%), radial-gradient(circle at 88% 8%, rgba(220, 220, 220, 0.12), transparent 32%), linear-gradient(145deg, rgba(8, 12, 18, 0.98), rgba(10, 10, 10, 0.96) 48%, rgba(14, 16, 20, 0.98)), repeating-linear-gradient(135deg, rgba(148, 163, 184, 0.04) 0px, rgba(148, 163, 184, 0.04) 1px, transparent 1px, transparent 15px)',
-        boxShadow: '0 20px 80px rgba(2, 8, 22, 0.7), inset 0 0 45px rgba(255, 255, 255, 0.05)',
-        fontFamily: "'Space Grotesk', 'Segoe UI', sans-serif",
+        color: '#f7f7f7',
+        backgroundColor: '#000',
+        background: '#000',
+        boxShadow: '0 20px 80px rgba(0, 0, 0, 0.75)',
+        fontFamily: "'Josefin Sans', sans-serif",
       }}
     >
       <style>
         {`
-          @import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&display=swap');
+          @import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@500;600;700&display=swap');
+          .interview-stars {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            background-image: radial-gradient(2.4px 2.4px at 18px 24px, rgba(255, 255, 255, 0.95), transparent 70%),
+              radial-gradient(1.6px 1.6px at 62px 96px, rgba(255, 255, 255, 0.85), transparent 70%),
+              radial-gradient(2px 2px at 120px 44px, rgba(255, 255, 255, 0.9), transparent 70%),
+              radial-gradient(1.4px 1.4px at 176px 120px, rgba(255, 255, 255, 0.75), transparent 70%),
+              radial-gradient(2.8px 2.8px at 216px 34px, rgba(255, 255, 255, 0.95), transparent 70%),
+              radial-gradient(1.8px 1.8px at 260px 168px, rgba(255, 255, 255, 0.85), transparent 70%),
+              radial-gradient(1.6px 1.6px at 310px 78px, rgba(255, 255, 255, 0.8), transparent 70%),
+              radial-gradient(2.2px 2.2px at 356px 210px, rgba(255, 255, 255, 0.9), transparent 70%),
+              radial-gradient(1.6px 1.6px at 402px 144px, rgba(255, 255, 255, 0.8), transparent 70%);
+            background-size: 200px 150px;
+            opacity: 0.4;
+            filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.4));
+            animation: starTwinkle 3s ease-in-out infinite;
+          }
+          .interview-stars--layer2 {
+            background-size: 300px 230px;
+            opacity: 0.24;
+            animation-duration: 7s;
+            animation-delay: -2.2s;
+          }
+          .interview-screen-root,
+          .interview-screen-root * {
+            font-weight: 400 !important;
+          }
+          .interview-screen-root .end-interview-btn {
+            font-weight: 700 !important;
+          }
           .transcript-scroll {
             scrollbar-width: thin;
             scrollbar-color: rgba(230, 230, 230, 0.9) rgba(20, 28, 40, 0.55);
@@ -943,37 +977,18 @@ export default function InterviewScreen() {
             0%, 100% { filter: invert(1) brightness(1.25) drop-shadow(0 0 12px rgba(255, 255, 255, 0.4)) drop-shadow(0 0 26px rgba(180, 210, 255, 0.25)); }
             50% { filter: invert(1) brightness(1.45) drop-shadow(0 0 15px rgba(255, 255, 255, 0.62)) drop-shadow(0 0 36px rgba(190, 220, 255, 0.42)); }
           }
+          @keyframes starTwinkle {
+            0% { opacity: 0.2; transform: translateY(0); }
+            40% { opacity: 0.42; }
+            70% { opacity: 0.28; transform: translateY(6px); }
+            100% { opacity: 0.22; transform: translateY(0); }
+          }
         `}
       </style>
 
       {/* ── Floating blob decorations (main's design) ── */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '-80px',
-          right: '-90px',
-          width: '280px',
-          height: '280px',
-          borderRadius: '34% 66% 61% 39% / 37% 43% 57% 63%',
-          background: 'radial-gradient(circle, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0))',
-          pointerEvents: 'none',
-          filter: 'blur(1px)',
-          animation: 'floatBlobA 7s ease-in-out infinite',
-        }}
-      />
-      <div
-        style={{
-          position: 'absolute',
-          bottom: '-100px',
-          left: '-80px',
-          width: '300px',
-          height: '300px',
-          borderRadius: '56% 44% 30% 70% / 41% 52% 48% 59%',
-          background: 'radial-gradient(circle, rgba(210, 210, 210, 0.2), rgba(210, 210, 210, 0))',
-          pointerEvents: 'none',
-          animation: 'floatBlobB 8s ease-in-out infinite',
-        }}
-      />
+      <div className="interview-stars" />
+      <div className="interview-stars interview-stars--layer2" />
 
       {/* ── Header: Starly logo, timer, Settings + End/Start ── */}
       <header
@@ -1033,7 +1048,7 @@ export default function InterviewScreen() {
             </div>
             <span
               style={{
-                fontFamily: "'DM Mono', monospace",
+                fontFamily: "'Josefin Sans', sans-serif",
                 fontSize: '11px',
                 fontWeight: '600',
                 letterSpacing: '0.08em',
@@ -1048,14 +1063,14 @@ export default function InterviewScreen() {
             <div
               style={{
                 padding: '4px 10px',
-                background: 'rgba(99,102,241,0.1)',
-                border: '1px solid rgba(99,102,241,0.25)',
+                background: '#141414',
+                border: '1px solid #2a2a2a',
                 borderRadius: '999px',
-                fontFamily: "'DM Mono', monospace",
+                fontFamily: "'Josefin Sans', sans-serif",
                 fontSize: '11px',
                 fontWeight: '600',
                 letterSpacing: '0.06em',
-                color: '#a5b4fc',
+                color: '#f3f4f6',
               }}
             >
               {questionLabel}
@@ -1066,15 +1081,18 @@ export default function InterviewScreen() {
         <div
           style={{
             justifySelf: 'center',
-            fontSize: '1.08rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '0.78rem',
             fontWeight: 700,
-            color: '#041018',
-            fontFamily: "'Unbounded', 'Space Grotesk', sans-serif",
-            background: 'linear-gradient(135deg, #f3f3f3 5%, #dcdcdc 52%, #b8b8b8 100%)',
-            border: '1px solid rgba(255, 255, 255, 0.45)',
-            borderRadius: '14px',
-            padding: '0.52rem 1rem',
-            boxShadow: '0 0 24px rgba(255, 255, 255, 0.25), inset 0 -6px 14px rgba(0, 0, 0, 0.18)',
+            color: '#f5f5f5',
+            fontFamily: "'Josefin Sans', sans-serif",
+            background: 'transparent',
+            border: '1px solid rgba(255, 255, 255, 0.24)',
+            borderRadius: '10px',
+            padding: '0.36rem 0.72rem',
+            boxShadow: 'none',
             letterSpacing: '0.08em',
           }}
         >
@@ -1082,22 +1100,7 @@ export default function InterviewScreen() {
         </div>
 
         <div style={{ justifySelf: 'end', display: 'flex', gap: '0.6rem' }}>
-          <button
-            type="button"
-            style={{
-              padding: '0.55rem 0.95rem',
-              borderRadius: '12px',
-              border: '1px solid rgba(255, 255, 255, 0.28)',
-              background: 'linear-gradient(145deg, rgba(8, 18, 34, 0.92), rgba(9, 20, 37, 0.8))',
-              color: '#f1f1f1',
-              fontSize: '0.9rem',
-              letterSpacing: '0.06em',
-              cursor: 'pointer',
-            }}
-          >
-            Settings
-          </button>
-          {phase === 'ready' ? (
+          {phase === 'ready' && (
             <button
               type="button"
               className="start-interview-btn"
@@ -1108,14 +1111,14 @@ export default function InterviewScreen() {
                 borderRadius: '12px',
                 border: 'none',
                 background: state.currentQuestion
-                  ? 'linear-gradient(135deg, #4338ca, #6366f1 50%, #22d3ee)'
+                  ? 'linear-gradient(135deg, #ffffff, #e6e6e6 55%, #cfcfcf)'
                   : '#111120',
-                color: '#fff',
+                color: '#0b0b0b',
                 fontSize: '0.9rem',
                 fontWeight: 700,
                 letterSpacing: '0.08em',
                 boxShadow: state.currentQuestion
-                  ? '0 6px 28px rgba(99,102,241,0.42), 0 0 0 1px rgba(99,102,241,0.2)'
+                  ? '0 0 18px rgba(255,255,255,0.28), 0 0 0 1px rgba(255,255,255,0.22)'
                   : 'none',
                 cursor: state.currentQuestion ? 'pointer' : 'not-allowed',
                 display: 'flex',
@@ -1126,28 +1129,28 @@ export default function InterviewScreen() {
               <div className="btn-shimmer" />
               Start &rarr;
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => void handleDone()}
-              disabled={phase === 'finished' || phase === 'speaking-question' || phase === 'thinking' || phase === 'transitioning'}
-              style={{
-                padding: '0.55rem 0.95rem',
-                borderRadius: '12px',
-                border: '1px solid rgba(255, 255, 255, 0.45)',
-                background: 'linear-gradient(130deg, #ffffff, #dcdcdc 45%, #bdbdbd)',
-                color: '#111111',
-                fontSize: '0.9rem',
-                fontWeight: 700,
-                letterSpacing: '0.08em',
-                boxShadow: '0 0 18px rgba(255, 255, 255, 0.22)',
-                cursor: phase === 'finished' || phase === 'transitioning' ? 'not-allowed' : 'pointer',
-                opacity: phase === 'finished' || phase === 'speaking-question' || phase === 'thinking' || phase === 'transitioning' ? 0.5 : 1,
-              }}
-            >
-              End
-            </button>
           )}
+          <button
+            className="end-interview-btn"
+            type="button"
+            onClick={() => void handleDone()}
+            disabled={phase === 'finished'}
+            style={{
+              padding: '0.55rem 0.95rem',
+              borderRadius: '12px',
+              border: '1px solid #2a2a2a',
+              background: '#CBFF70',
+              color: '#000',
+              fontSize: '0.9rem',
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              boxShadow: '0 0 12px rgba(255, 255, 255, 0.1)',
+              cursor: phase === 'finished' ? 'not-allowed' : 'pointer',
+              opacity: 1,
+            }}
+          >
+            End Interview
+          </button>
         </div>
       </header>
 
@@ -1191,8 +1194,8 @@ export default function InterviewScreen() {
                 position: 'absolute',
                 inset: 0,
                 borderRadius: '50%',
-                border: '3px solid rgba(99,102,241,0.12)',
-                borderTopColor: '#6366f1',
+                border: '3px solid rgba(255,255,255,0.14)',
+                borderTopColor: '#f5f5f5',
                 animation: 'spin 0.8s linear infinite',
               }}
             />
@@ -1201,8 +1204,8 @@ export default function InterviewScreen() {
                 position: 'absolute',
                 inset: '6px',
                 borderRadius: '50%',
-                border: '3px solid rgba(34,211,238,0.1)',
-                borderBottomColor: '#22d3ee',
+                border: '3px solid rgba(255,255,255,0.08)',
+                borderBottomColor: '#d4d4d4',
                 animation: 'spin 1.2s linear infinite reverse',
               }}
             />
@@ -1213,7 +1216,7 @@ export default function InterviewScreen() {
             <p
               style={{
                 margin: 0,
-                fontFamily: "'Unbounded', 'Space Grotesk', sans-serif",
+                fontFamily: "'Josefin Sans', sans-serif",
                 fontSize: '1.15rem',
                 fontWeight: 700,
                 color: '#e2e8f0',
@@ -1249,10 +1252,10 @@ export default function InterviewScreen() {
                       height: '10px',
                       borderRadius: '50%',
                       background: scored
-                        ? '#22d3ee'
-                        : 'rgba(99,102,241,0.25)',
+                        ? '#f5f5f5'
+                        : 'rgba(255,255,255,0.2)',
                       boxShadow: scored
-                        ? '0 0 8px rgba(34,211,238,0.5)'
+                        ? '0 0 8px rgba(255,255,255,0.4)'
                         : 'none',
                       transition: 'all 0.3s ease',
                     }}
@@ -1286,13 +1289,13 @@ export default function InterviewScreen() {
                 minHeight: 0,
                 height: '100%',
                 boxSizing: 'border-box',
-                border: '1px solid rgba(255, 255, 255, 0.14)',
+                border: '1px solid #2a2a2a',
                 borderRadius: '22px 10px 22px 10px',
                 overflow: 'hidden',
-                background: 'linear-gradient(165deg, rgba(10, 20, 37, 0.88), rgba(6, 12, 23, 0.95))',
+                background: '#111',
                 color: '#f7f7f7',
                 position: 'relative',
-                boxShadow: 'inset 0 0 26px rgba(255, 255, 255, 0.05), 0 10px 24px rgba(0, 0, 0, 0.35)',
+                boxShadow: '0 10px 24px rgba(0, 0, 0, 0.5)',
               }}
             >
               <video
@@ -1380,7 +1383,7 @@ export default function InterviewScreen() {
                     height: '42px',
                     borderRadius: '999px',
                     border: cameraEnabled ? '1px solid rgba(255, 255, 255, 0.28)' : '1px solid rgba(190, 190, 190, 0.35)',
-                    background: cameraEnabled ? 'rgba(18, 18, 18, 0.9)' : 'rgba(42, 42, 42, 0.9)',
+                    background: '#141414',
                     color: '#fff',
                     cursor: 'pointer',
                     display: 'flex',
@@ -1409,8 +1412,8 @@ export default function InterviewScreen() {
                     alignItems: 'center',
                     gap: '6px',
                     padding: '4px 10px',
-                    background: userSpeaking ? 'rgba(34,197,94,0.15)' : 'rgba(148,163,184,0.08)',
-                    border: `1px solid ${userSpeaking ? 'rgba(34,197,94,0.35)' : 'rgba(148,163,184,0.18)'}`,
+                    background: '#141414',
+                    border: `1px solid ${userSpeaking ? 'rgba(34,197,94,0.35)' : 'rgba(255,255,255,0.18)'}`,
                     borderRadius: '999px',
                     transition: 'background 0.2s ease, border-color 0.2s ease',
                     zIndex: 2,
@@ -1428,7 +1431,7 @@ export default function InterviewScreen() {
                   />
                   <span
                     style={{
-                      fontFamily: "'DM Mono', monospace",
+                fontFamily: "'Josefin Sans', sans-serif",
                       fontSize: '10px',
                       fontWeight: '600',
                       letterSpacing: '0.06em',
@@ -1448,9 +1451,9 @@ export default function InterviewScreen() {
                 minHeight: 0,
                 height: '100%',
                 boxSizing: 'border-box',
-                border: '1px solid rgba(255, 255, 255, 0.14)',
+                border: '1px solid #2a2a2a',
                 borderRadius: '10px 22px 10px 22px',
-                background: 'linear-gradient(160deg, rgba(12, 22, 34, 0.95), rgba(8, 16, 27, 0.98))',
+                background: '#000',
                 color: '#f0f0f0',
                 padding: '1.15rem',
                 display: 'flex',
@@ -1459,7 +1462,7 @@ export default function InterviewScreen() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 overflow: 'hidden',
-                boxShadow: 'inset 0 0 26px rgba(255, 255, 255, 0.05), 0 10px 24px rgba(0, 0, 0, 0.35)',
+                boxShadow: '0 10px 24px rgba(0, 0, 0, 0.48)',
               }}
             >
               <div style={{ width: '100%', height: '100%', flex: '1 1 auto', minHeight: 0, position: 'relative' }}>
@@ -1496,7 +1499,7 @@ export default function InterviewScreen() {
           {/* Typewriter question display — container always present, content fades in/out */}
           <div style={{ position: 'relative', zIndex: 1 }}>
             <TypewriterQuestion
-              text={state.currentQuestion?.text ?? ''}
+              text={state.currentQuestion?.text ?? testQuestionText}
               isTyping={false}
               isComplete={true}
               visible={phase === 'ready' || phase === 'speaking-question' || phase === 'thinking' || phase === 'recording' || phase === 'silence-detected' || phase === 'asking-done'}
@@ -1520,8 +1523,8 @@ export default function InterviewScreen() {
                   maxHeight: active ? '40px' : '0px',
                   overflow: 'hidden',
                   borderRadius: '14px',
-                  background: 'rgba(99,102,241,0.06)',
-                  border: active ? '1px solid rgba(99,102,241,0.16)' : '1px solid transparent',
+                  background: '#141414',
+                  border: active ? '1px solid #2a2a2a' : '1px solid transparent',
                   animation: phase === 'thinking' ? 'breathing 2s ease-in-out infinite' : 'none',
                   transition: 'max-height 0.3s ease, padding 0.3s ease, border-color 0.3s ease',
                 }}
@@ -1531,7 +1534,7 @@ export default function InterviewScreen() {
                     width: '7px',
                     height: '7px',
                     borderRadius: '50%',
-                    background: phase === 'transitioning' ? '#a78bfa' : '#818cf8',
+                    background: phase === 'transitioning' ? '#f5f5f5' : '#cbff70',
                     flexShrink: 0,
                     opacity: active ? 0.8 : 0,
                     transition: 'opacity 0.3s ease',
@@ -1540,10 +1543,10 @@ export default function InterviewScreen() {
                 />
                 <span
                   style={{
-                    fontFamily: "'Space Grotesk', sans-serif",
+                    fontFamily: "'Josefin Sans', sans-serif",
                     fontSize: '13px',
                     fontWeight: '600',
-                    color: phase === 'transitioning' ? '#c4b5fd' : '#a5b4fc',
+                    color: phase === 'transitioning' ? '#f5f5f5' : '#d9f99d',
                     letterSpacing: '0.01em',
                     opacity: active ? 1 : 0,
                     transition: 'opacity 0.3s ease',
@@ -1632,11 +1635,11 @@ export default function InterviewScreen() {
               flex: '0 0 240px',
               minHeight: 0,
               padding: '0.65rem 1.1rem 1.1rem',
-              border: '1px solid rgba(255, 255, 255, 0.14)',
+              border: '1px solid #2a2a2a',
               borderRadius: '22px',
-              background: 'linear-gradient(165deg, rgba(10, 19, 31, 0.94), rgba(6, 13, 23, 0.98))',
-              color: '#ecfffb',
-              boxShadow: 'inset 0 0 22px rgba(255, 255, 255, 0.05), 0 10px 24px rgba(0, 0, 0, 0.35)',
+              background: 'transparent',
+              color: '#f5f5f5',
+              boxShadow: 'none',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
@@ -1653,7 +1656,7 @@ export default function InterviewScreen() {
             >
               <strong
                 style={{
-                  fontFamily: "'Unbounded', 'Space Grotesk', sans-serif",
+                  fontFamily: "'Josefin Sans', sans-serif",
                   fontSize: '0.85rem',
                   letterSpacing: '0.14em',
                   textTransform: 'uppercase',
@@ -1675,14 +1678,8 @@ export default function InterviewScreen() {
                 paddingRight: '0.2rem',
               }}
             >
-              <p style={{ marginTop: 0, lineHeight: 1.54, color: '#d7d7d7' }}>
-                {state.liveTranscript || deepgram.transcript || (
-                  phase === 'ready'
-                    ? 'Click "Start" to begin the interview. Your transcript will appear here as you speak.'
-                    : phase === 'speaking-question' || phase === 'thinking'
-                      ? 'Preparing to listen...'
-                      : 'Waiting for you to speak...'
-                )}
+              <p style={{ marginTop: 0, fontSize: '16px', lineHeight: 1.54, color: '#d7d7d7' }}>
+                {state.liveTranscript || deepgram.transcript || testTranscriptText}
               </p>
             </div>
 
