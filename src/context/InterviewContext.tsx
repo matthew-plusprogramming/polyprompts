@@ -26,6 +26,8 @@ const initialState: InterviewState = {
   speakingDurationSeconds: 0,
   totalDurationSeconds: 0,
   resumeData: null,
+  resumeText: null,
+  jobDescription: null,
   sessionHistory: [],
   ttsVoice: 'alloy',
   ttsSpeed: 1.05,
@@ -80,6 +82,10 @@ function interviewReducer(state: InterviewState, action: InterviewAction): Inter
     }
     case 'SET_RESUME_DATA':
       return { ...state, resumeData: action.payload };
+    case 'SET_RESUME_TEXT':
+      return { ...state, resumeText: action.payload };
+    case 'SET_JOB_DESCRIPTION':
+      return { ...state, jobDescription: action.payload };
     case 'START_RECORDING':
       return { ...state, isRecording: true, liveTranscript: '', audioBlob: null };
     case 'STOP_RECORDING':
@@ -118,7 +124,7 @@ function interviewReducer(state: InterviewState, action: InterviewAction): Inter
     case 'SET_TTS_SPEED':
       return { ...state, ttsSpeed: action.payload };
     case 'NEXT_QUESTION':
-      return { ...initialState, role: state.role, difficulty: state.difficulty, resumeData: state.resumeData, sessionHistory: state.sessionHistory, ttsVoice: state.ttsVoice, ttsSpeed: state.ttsSpeed };
+      return { ...initialState, role: state.role, difficulty: state.difficulty, resumeData: state.resumeData, resumeText: state.resumeText, jobDescription: state.jobDescription, sessionHistory: state.sessionHistory, ttsVoice: state.ttsVoice, ttsSpeed: state.ttsSpeed };
     case 'SAVE_SESSION':
       return { ...state, sessionHistory: [...state.sessionHistory, action.payload] };
     default:

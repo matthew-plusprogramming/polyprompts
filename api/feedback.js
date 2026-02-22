@@ -98,7 +98,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "OPENAI_API_KEY not set" });
   }
 
-  const { questions, answers } = req.body ?? {};
+  const { questions, answers, resumeText, jobDescription } = req.body ?? {};
 
   if (!Array.isArray(questions) || !Array.isArray(answers) || questions.length !== answers.length) {
     return res.status(400).json({ error: "questions and answers must be parallel arrays" });
@@ -107,6 +107,11 @@ export default async function handler(req, res) {
   const combined = questions
     .map((q, i) => `Question ${i + 1}: ${q}\nAnswer ${i + 1}: ${answers[i]}`)
     .join("\n\n");
+
+  const resumeContext =
+    resumeText && jobDescription
+      ? `\n\nCANDIDATE CONTEXT (use this to tailor your feedback):\nResume excerpt: ${String(resumeText).slice(0, 3000)}\nTarget role / Job description: ${String(jobDescription).slice(0, 2000)}\n`
+      : "";
 
   try {
     const response = await fetch("https://api.openai.com/v1/responses", {
@@ -134,6 +139,7 @@ FOR THE OVERALL INTERVIEW:
 - Provide overall what_went_well, needs_improvement, summary
 
 You MUST return exactly ${questions.length} items in the "questions" array.
+${resumeContext}
 Transcript:
 ${combined}
 `,
