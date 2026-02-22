@@ -43,8 +43,8 @@ export default function SilenceNudge({ visible, message }: Props) {
             display: 'inline-flex',
             alignItems: 'center',
             gap: '10px',
-            background: 'rgba(99,102,241,0.1)',
-            border: '1px solid rgba(99,102,241,0.22)',
+            background: 'rgba(209,213,219,0.06)',
+            border: '1px solid rgba(209,213,219,0.18)',
             borderRadius: '999px',
             padding: '10px 22px',
             backdropFilter: 'blur(12px)',
@@ -62,7 +62,7 @@ export default function SilenceNudge({ visible, message }: Props) {
               width: '7px',
               height: '7px',
               borderRadius: '50%',
-              background: '#a5b4fc',
+              background: '#d1d5db',
               flexShrink: 0,
               opacity: 0.75,
             }}
@@ -72,7 +72,7 @@ export default function SilenceNudge({ visible, message }: Props) {
             style={{
               fontSize: '13px',
               fontWeight: '500',
-              color: '#c4b5fd',
+              color: '#d1d5db',
               fontFamily: "'Josefin Sans', sans-serif",
               letterSpacing: '0.01em',
               lineHeight: 1.4,

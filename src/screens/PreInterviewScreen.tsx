@@ -227,6 +227,10 @@ export default function PreInterviewScreen() {
           from { opacity: 0; transform: translateY(6px); }
           to   { opacity: 1; transform: translateY(0); }
         }
+        @keyframes logoPulse {
+          0%, 100% { transform: scale(1.08); }
+          50% { transform: scale(1.18); }
+        }
         @keyframes starlyFlow {
           0%, 100% { transform: translate(-50%, -50%) scale(1); }
           50% { transform: translate(-50%, -50%) scale(1.06); }
@@ -284,6 +288,7 @@ export default function PreInterviewScreen() {
               : 'brightness(0.7)',
             transform: ttsPlaying ? 'scale(1.12)' : 'scale(1)',
             transition: 'opacity 0.4s ease, filter 0.4s ease, transform 0.4s ease',
+            animation: ttsPlaying ? 'logoPulse 2s ease-in-out infinite' : 'none',
           }}
         />
       </div>
@@ -365,8 +370,8 @@ export default function PreInterviewScreen() {
               alignItems: 'center',
               gap: '10px',
               padding: '8px 20px',
-              background: 'rgba(163,230,53,0.06)',
-              border: '1px solid rgba(163,230,53,0.18)',
+              background: 'rgba(209,213,219,0.06)',
+              border: '1px solid rgba(209,213,219,0.18)',
               borderRadius: '999px',
             }}
           >
@@ -376,7 +381,7 @@ export default function PreInterviewScreen() {
                   position: 'absolute',
                   inset: 0,
                   borderRadius: '50%',
-                  background: '#a3e635',
+                  background: '#d1d5db',
                   animation: 'pulse-ring 1.6s ease-out infinite',
                 }}
               />
@@ -385,7 +390,7 @@ export default function PreInterviewScreen() {
                   position: 'absolute',
                   inset: 0,
                   borderRadius: '50%',
-                  background: '#a3e635',
+                  background: '#d1d5db',
                 }}
               />
             </div>
@@ -394,7 +399,7 @@ export default function PreInterviewScreen() {
                 fontFamily: "'Josefin Sans', sans-serif",
                 fontSize: '12px',
                 fontWeight: '600',
-                color: '#a3e635',
+                color: '#d1d5db',
                 letterSpacing: '0.1em',
               }}
             >
@@ -409,8 +414,8 @@ export default function PreInterviewScreen() {
               alignItems: 'center',
               gap: '10px',
               padding: '8px 20px',
-              background: 'rgba(167,139,250,0.06)',
-              border: '1px solid rgba(167,139,250,0.18)',
+              background: 'rgba(163,230,53,0.06)',
+              border: '1px solid rgba(163,230,53,0.18)',
               borderRadius: '999px',
             }}
           >
@@ -419,7 +424,7 @@ export default function PreInterviewScreen() {
                 width: '10px',
                 height: '10px',
                 borderRadius: '50%',
-                background: '#a78bfa',
+                background: '#a3e635',
               }}
             />
             <span
@@ -427,7 +432,7 @@ export default function PreInterviewScreen() {
                 fontFamily: "'Josefin Sans', sans-serif",
                 fontSize: '12px',
                 fontWeight: '600',
-                color: '#a78bfa',
+                color: '#a3e635',
                 letterSpacing: '0.1em',
               }}
             >

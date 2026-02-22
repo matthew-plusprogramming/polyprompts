@@ -130,7 +130,7 @@ export default function TypewriterQuestion({
         style={{
           margin: 0,
           fontFamily: "'Josefin Sans', sans-serif",
-          fontSize: 'clamp(16px, 2.2vw, 22px)',
+          fontSize: '16px',
           fontWeight: 700,
           lineHeight: 1.55,
           letterSpacing: '-0.005em',
