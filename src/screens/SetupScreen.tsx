@@ -1156,6 +1156,46 @@ export default function SetupScreen() {
   const [launching, setLaunching] = useState(false);
   const [diffHint, setDiffHint] = useState<string | null>(null);
 
+  const toInterviewRole = (uiRole: UiRole): Role => {
+    if (uiRole === 'pm') return 'pm_intern';
+    return 'swe_intern';
+  };
+
+  // Pre-generate questions in the background as soon as inputs are ready
+  const prefetchedQuestionsRef = useRef<{
+    key: string;
+    promise: Promise<import('../types').Question[]>;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!role) return;
+    const mappedRole = toInterviewRole(role);
+    const isResumeReady = mode === 'resume' && resumeResult && jobDescription.trim();
+    const isGenericReady = mode === 'generic';
+    if (!isResumeReady && !isGenericReady) return;
+
+    const cacheKey = `${mappedRole}:${difficulty}:${mode}:${resumeResult?.text?.slice(0, 50) ?? ''}:${jobDescription.slice(0, 50)}`;
+    if (prefetchedQuestionsRef.current?.key === cacheKey) return;
+
+    log.info('Prefetching questions in background', { role: mappedRole, difficulty, mode });
+    const promise = loadQuestions({
+      role: mappedRole,
+      difficulty,
+      count: 2,
+      ...(mode === 'resume' && resumeResult ? { resumeText: resumeResult.text, jobDescription: jobDescription.trim() } : {}),
+    });
+    prefetchedQuestionsRef.current = { key: cacheKey, promise };
+
+    // Also prefetch TTS as soon as questions resolve
+    promise.then(questions => {
+      if (prefetchedQuestionsRef.current?.key !== cacheKey) return; // stale
+      const textsToCache = questions.map(q => q.text);
+      if (questions.length > 1) textsToCache.push("Great, let's move on to the next question.");
+      textsToCache.push("It sounds like you might be wrapping up. Are you finished with your answer, or would you like to continue?");
+      prefetchTTS(textsToCache);
+    }).catch(() => { /* will retry in handleStart */ });
+  }, [role, difficulty, mode, resumeResult, jobDescription]);
+
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 60);
     return () => clearTimeout(t);
@@ -1164,11 +1204,6 @@ export default function SetupScreen() {
   const selectedRole = ROLES.find((r) => r.id === role);
   const selectedDiff = DIFFICULTIES.find((d) => d.id === difficulty);
   const canStart = Boolean(role) && (mode === 'generic' || (mode === 'resume' && resumeResult && jobDescription.trim()));
-
-  const toInterviewRole = (uiRole: UiRole): Role => {
-    if (uiRole === 'pm') return 'pm_intern';
-    return 'swe_intern';
-  };
 
   const handleStart = async () => {
     if (!canStart || launching || !role) return;
@@ -1186,12 +1221,21 @@ export default function SetupScreen() {
     }
 
     try {
-      const questions = await loadQuestions({
-        role: mappedRole,
-        difficulty,
-        count: 2,
-        ...(mode === 'resume' && resumeResult ? { resumeText: resumeResult.text, jobDescription: jobDescription.trim() } : {}),
-      });
+      // Use prefetched questions if the cache key matches, otherwise generate fresh
+      const cacheKey = `${mappedRole}:${difficulty}:${mode}:${resumeResult?.text?.slice(0, 50) ?? ''}:${jobDescription.slice(0, 50)}`;
+      let questions: import('../types').Question[];
+      if (prefetchedQuestionsRef.current?.key === cacheKey) {
+        log.info('Using prefetched questions');
+        questions = await prefetchedQuestionsRef.current.promise;
+      } else {
+        log.info('Prefetch miss, generating questions fresh');
+        questions = await loadQuestions({
+          role: mappedRole,
+          difficulty,
+          count: 2,
+          ...(mode === 'resume' && resumeResult ? { resumeText: resumeResult.text, jobDescription: jobDescription.trim() } : {}),
+        });
+      }
 
       log.info('Questions loaded', { count: questions.length, ids: questions.map(q => q.id) });
       if (questions.length > 0) {
